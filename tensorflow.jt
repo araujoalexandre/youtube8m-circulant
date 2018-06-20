@@ -15,8 +15,11 @@ DATE_STR=$(date '+%Y-%m-%d_%H.%S')
 
 EXEC_DIR="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/google_youtube-8m"
 DATA_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m/${DATA_TYPE}"
+
 TRAIN_DIR="/linkhome/rech/grpgen/ubx31mc/yt8m_models/${DATA_TYPE}/${DATE_STR}"
+LOGS_DIR="/linkhome/rech/grpgen/ubx31mc/yt8m_models/${DATA_TYPE}/${DATE_STR}_logs"
 mkdir ${TRAIN_DIR}
+mkdir ${LOGS_DIR}
 
 WORKER_PORT=2222
 PS_PORT=2223
@@ -68,7 +71,7 @@ do
   fi
 let index=$index+1
 done
-tf_worker=[${tf_worker}]
+tf_worker=[${tf_worker::-1}]
 
 
 function format_tf_config {
@@ -76,7 +79,7 @@ function format_tf_config {
 }
 
 function format_redirect {
-  echo "${TRAIN_DIR}/log_worker_$1.logs"
+  echo "${LOGS_DIR}/log_worker_$1.logs"
 }
 
 
