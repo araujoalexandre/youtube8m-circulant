@@ -13,7 +13,7 @@ ml anaconda3/5.0
 DATA_TYPE="video"
 DATE_STR=$(date '+%Y-%m-%d_%H.%S')
 
-EXEC_DIR="/linkhome/rech/grpgen/ubx31mc"
+EXEC_DIR="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/google_youtube-8m"
 DATA_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m/${DATA_TYPE}"
 TRAIN_DIR="/linkhome/rech/grpgen/ubx31mc/yt8m_models/${DATA_TYPE}/${DATE_STR}"
 mkdir ${TRAIN_DIR}
@@ -81,7 +81,7 @@ function format_redirect {
 
 
 CWD="cd $EXEC_DIR; "
-EXEC="python3 check_host.py ${PYTHON_ARGS}"
+EXEC="python3 train.py ${PYTHON_ARGS}"
 echo ${EXEC}
 
 index=0
