@@ -79,7 +79,7 @@ function format_tf_config {
 }
 
 function format_redirect {
-  echo "${LOGS_DIR}/log_worker_$1.logs"
+  echo "${LOGS_DIR}/log_$1_$2.logs"
 }
 
 
@@ -91,17 +91,18 @@ index=0
 FIRST_WORKER=""
 for host in $TMP_HOSTS
 do
-  REDIRECT=$(format_redirect $index)
   if [ $index -eq 0 ]
   then
     # launch parameters server
     TF_CONFIG="export TF_CONFIG='$(format_tf_config ps $index)'; "
     CUDA="export CUDA_VISIBLE_DEVICES='';"
+    REDIRECT=$(format_redirect ps $index)
     ARG_GPU=" --num_gpu 0"
-    blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU}" &
+    blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
     sleep 5
 
     # launch master
+    REDIRECT=$(format_redirect master $index)
     TF_CONFIG="export TF_CONFIG='$(format_tf_config master $index)'; "
     # keep like this for the rest of the for loop
     CUDA="unset CUDA_VISIBLE_DEVICES;"
@@ -109,6 +110,7 @@ do
     blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
   else
     # launch worker
+    REDIRECT=$(format_redirect worker $index)
     TF_CONFIG="export TF_CONFIG='$(format_tf_config worker $index)'; "
     blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
   fi
