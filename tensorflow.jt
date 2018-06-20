@@ -95,7 +95,7 @@ do
     TF_CONFIG="export TF_CONFIG='$(format_tf_config ps $index)'; "
     CUDA="export CUDA_VISIBLE_DEVICES='';"
     ARG_GPU=" --num_gpu 0"
-    blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
+    blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU}" &
     sleep 5
 
     # launch master
