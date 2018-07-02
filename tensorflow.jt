@@ -12,7 +12,7 @@ ml anaconda/py3 cudnn nccl
 source activate tensorflow1.8-py3
 
 DATA_TYPE="video"
-DATE_STR=$(date '+%Y-%m-%d_%H.%S')
+DATE_STR=$(date '+%Y-%m-%d_%H.%M')
 
 EXEC_DIR="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/google_youtube-8m"
 DATA_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m/${DATA_TYPE}"
