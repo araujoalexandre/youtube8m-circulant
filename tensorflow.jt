@@ -19,6 +19,7 @@ CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config.cfg"
 DATA_TYPE=$(head $CONFIG_FILE --lines 1)
 PYTHON_ARGS=$(tail $CONFIG_FILE -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g')
 
+
 DATE_STR=$(date '+%Y-%m-%d_%H.%M')
 
 EXEC_DIR="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/google_youtube-8m"
@@ -31,6 +32,7 @@ mkdir ${LOGS_DIR}
 
 WORKER_PORT=2222
 PS_PORT=2223
+
 
 HOST=false
 CORE=false
