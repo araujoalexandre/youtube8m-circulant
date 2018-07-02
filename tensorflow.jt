@@ -8,7 +8,8 @@
 #BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.tensorflow.out
 #BSUB -e /linkhome/rech/grpgen/ubx31mc/%J.tensorflow.err
 
-ml anaconda3/5.0
+ml anaconda/py3 cudnn nccl
+source activate tensorflow1.8-py3
 
 DATA_TYPE="video"
 DATE_STR=$(date '+%Y-%m-%d_%H.%S')
@@ -84,6 +85,7 @@ function format_redirect {
 
 
 CWD="cd $EXEC_DIR; "
+LIB="export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwrlocal/pub/cudnn/7.1.4/lib64:/pwrlocal/pub/nccl/2.2.13-1/lib:$LD_LIBRARY_PATH"
 EXEC="python3 train.py ${PYTHON_ARGS}"
 echo ${EXEC}
 
@@ -98,7 +100,7 @@ do
     CUDA="export CUDA_VISIBLE_DEVICES='';"
     REDIRECT=$(format_redirect ps $index)
     ARG_GPU=" --num_gpu 0"
-    blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
+    blaunch -no-wait -z $host "${LIB}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
     sleep 5
 
     # launch master
@@ -107,12 +109,12 @@ do
     # keep like this for the rest of the for loop
     CUDA="unset CUDA_VISIBLE_DEVICES;"
     ARG_GPU=" --num_gpu 0"
-    blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
+    blaunch -no-wait -z $host "${LIB}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
   else
     # launch worker
     REDIRECT=$(format_redirect worker $index)
     TF_CONFIG="export TF_CONFIG='$(format_tf_config worker $index)'; "
-    blaunch -no-wait -z $host "${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
+    blaunch -no-wait -z $host "${LIB}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
   fi
 
   let index=$index+1
