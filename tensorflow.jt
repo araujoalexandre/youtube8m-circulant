@@ -93,7 +93,8 @@ function format_redirect {
 
 
 CWD="cd $EXEC_DIR; "
-LIB="export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwrlocal/pub/cudnn/7.1.4/lib64:/pwrlocal/pub/nccl/2.2.13-1/lib:$LD_LIBRARY_PATH; "
+EXPORT="export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwrlocal/pub/cudnn/7.1.4/lib64:/pwrlocal/pub/nccl/2.2.13-1/lib:$LD_LIBRARY_PATH; "
+EXPORT+="export ${TRAIN_DIR}; export ${DATA_DIR}; "
 EXEC="python3 train.py ${PYTHON_ARGS}"
 echo ${EXEC}
 
