@@ -112,8 +112,9 @@ do
     blaunch -no-wait -z $host "${LIB}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
   else
     # launch worker
-    REDIRECT=$(format_redirect worker $index)
-    TF_CONFIG="export TF_CONFIG='$(format_tf_config worker $index)'; "
+    let worker_index=$index-1
+    REDIRECT=$(format_redirect worker $worker_index)
+    TF_CONFIG="export TF_CONFIG='$(format_tf_config worker $worker_index)'; "
     blaunch -no-wait -z $host "${LIB}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
   fi
 
