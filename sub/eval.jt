@@ -11,12 +11,20 @@ ml anaconda/py3 cudnn nccl
 source activate tensorflow1.8-py3
 
 DATA_TYPE="frame"
-EXEC_DIR="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/google_youtube-8m"
 TRAIN_DIR="${WORKDIR}/yt8m_models/${DATA_TYPE}/2018-07-02_18.00"
+
+# train dir should be updated in the config/restart.cfg file
+EVAL_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/restart.cfg"
+TRAIN_DIR=$(head $EVAL_CONFIG_FILE --lines 1)
+
+# exec folder should be updated in the config/exec.cfg file
+EXEC_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/exec.cfg"
+EXEC_DIR=$(head $EXEC_CONFIG_FILE --lines 1)
+
 TRAIN_DIR_LOG+=$TRAIN_DIR"_logs/log_eval.logs"
 EXPORT="export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwrlocal/pub/cudnn/7.1.4/lib64:/pwrlocal/pub/nccl/2.2.13-1/lib:$LD_LIBRARY_PATH; "
 
 $EXPORT; python3 ${EXEC_DIR}/eval.py \
 --train_dir ${TRAIN_DIR} \
 --eval_data_pattern=${WORKDIR}/yt8m/${DATA_TYPE}/valid*.tfrecord \
---num_readers 100 &> $TRAIN_DIR_LOG &
+--num_readers 100 &>> $TRAIN_DIR_LOG &

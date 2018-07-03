@@ -15,13 +15,16 @@ source activate tensorflow1.8-py3
 # the exec args can be parse from the second line :
 # --args1 value1 \
 # --args2 value2 ... 
-CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config.cfg"
+CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/train.cfg"
 DATA_TYPE=$(head $CONFIG_FILE --lines 1)
 PYTHON_ARGS=$(tail $CONFIG_FILE -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g')
 
-DATE_STR=$(date '+%Y-%m-%d_%H.%M')
+DATE_STR=$(date '+%Y-%m-%d_%H.%M.%S')
 
-EXEC_DIR="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/google_youtube-8m"
+# exec folder should be updated in the config/exec.cfg file
+EXEC_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/exec.cfg"
+EXEC_DIR=$(head $EXEC_CONFIG_FILE --lines 1)
+
 DATA_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m/${DATA_TYPE}"
 
 TRAIN_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m_models/${DATA_TYPE}/${DATE_STR}"
