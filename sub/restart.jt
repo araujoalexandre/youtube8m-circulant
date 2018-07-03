@@ -21,7 +21,7 @@ TRAIN_DIR=$(head $RESTART_CONFIG_FILE --lines 1)
 # --args2 value2 ... 
 CONFIG_FILE="${TRAIN_DIR}/train.cfg"
 DATA_TYPE=$(head $CONFIG_FILE --lines 1)
-PYTHON_ARGS=$(tail config.cfg -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g' | sed -e 's/--start_new_model//g')
+PYTHON_ARGS=$(tail $CONFIG_FILE -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g' | sed -e 's/--start_new_model//g')
 
 # exec folder should be updated in the config/exec.cfg file
 EXEC_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/exec.cfg"
