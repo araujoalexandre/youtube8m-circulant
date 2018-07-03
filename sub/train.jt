@@ -33,7 +33,7 @@ mkdir ${TRAIN_DIR}
 mkdir ${LOGS_DIR}
 
 # copy config file to train folder
-cp ${CONFIG_FILE} ${TRAIN_DIR}/
+cp ${CONFIG_FILE} ${LOGS_DIR}/
 
 WORKER_PORT=2222
 PS_PORT=2223
