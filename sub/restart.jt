@@ -20,11 +20,11 @@ TRAIN_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m_models/frame/2018-07-02_18.00"
 # --args2 value2 ... 
 CONFIG_FILE="${TRAIN_DIR}/config.cfg"
 DATA_TYPE=$(head $CONFIG_FILE --lines 1)
-PYTHON_ARGS=$(tail $CONFIG_FILE -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g')
+PYTHON_ARGS=$(tail config.cfg -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g' | sed -e 's/--start_new_model//g')
 
 EXEC_DIR="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/google_youtube-8m"
 DATA_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m/${DATA_TYPE}"
-LOGS_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m_models/${DATA_TYPE}/${DATE_STR}_logs"
+LOGS_DIR="${TRAIN_DIR}_logs"
 
 
 WORKER_PORT=2222
