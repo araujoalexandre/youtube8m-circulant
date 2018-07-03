@@ -19,7 +19,7 @@ TRAIN_DIR=$(head $RESTART_CONFIG_FILE --lines 1)
 # the exec args can be parse from the second line :
 # --args1 value1 \
 # --args2 value2 ... 
-CONFIG_FILE="${TRAIN_DIR}/config.cfg"
+CONFIG_FILE="${TRAIN_DIR}/train.cfg"
 DATA_TYPE=$(head $CONFIG_FILE --lines 1)
 PYTHON_ARGS=$(tail config.cfg -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g' | sed -e 's/--start_new_model//g')
 
