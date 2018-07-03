@@ -11,30 +11,24 @@
 ml anaconda/py3 cudnn nccl
 source activate tensorflow1.8-py3
 
+# update this line
+TRAIN_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m_models/frame/2018-07-02_18.00"
+
 # config file start with the data type on the first line [video | frame]
 # the exec args can be parse from the second line :
 # --args1 value1 \
 # --args2 value2 ... 
-CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config.cfg"
+CONFIG_FILE="${TRAIN_DIR}/config.cfg"
 DATA_TYPE=$(head $CONFIG_FILE --lines 1)
 PYTHON_ARGS=$(tail $CONFIG_FILE -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g')
 
-DATE_STR=$(date '+%Y-%m-%d_%H.%M')
-
 EXEC_DIR="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/google_youtube-8m"
 DATA_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m/${DATA_TYPE}"
-
-TRAIN_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m_models/${DATA_TYPE}/${DATE_STR}"
 LOGS_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m_models/${DATA_TYPE}/${DATE_STR}_logs"
-mkdir ${TRAIN_DIR}
-mkdir ${LOGS_DIR}
 
-# copy config file to train folder
-cp $CONFIG_FILE $TRAIN_DIR
 
 WORKER_PORT=2222
 PS_PORT=2223
-
 
 HOST=false
 CORE=false
@@ -111,7 +105,7 @@ do
     CUDA="export CUDA_VISIBLE_DEVICES='';"
     REDIRECT=$(format_redirect ps $index)
     ARG_GPU=" --num_gpu 0"
-    blaunch -no-wait -z $host "${EXPORT}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
+    blaunch -no-wait -z $host "${EXPORT}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &>> ${REDIRECT}" &
     sleep 5
 
     # launch master
@@ -120,14 +114,14 @@ do
     # keep like this for the rest of the for loop
     CUDA="export CUDA_VISIBLE_DEVICES='0,1,2,3'; "
     ARG_GPU=" --num_gpu 4"
-    blaunch -no-wait -z $host "${EXPORT}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
+    blaunch -no-wait -z $host "${EXPORT}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &>> ${REDIRECT}" &
     sleep 3
   else
     # launch worker
     let worker_index=$index-1
     REDIRECT=$(format_redirect worker $worker_index)
     TF_CONFIG="export TF_CONFIG='$(format_tf_config worker $worker_index)'; "
-    blaunch -no-wait -z $host "${EXPORT}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
+    blaunch -no-wait -z $host "${EXPORT}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &>> ${REDIRECT}" &
   fi
 
   let index=$index+1
