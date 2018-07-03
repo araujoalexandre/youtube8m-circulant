@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#BSUB -J test
+#BSUB -J training
 #BSUB -gpu "num=4:mode=exclusive_process:mps=no:j_exclusive=yes"
 #BSUB -n 8,11
 #BSUB -R "span[ptile=1]"
-# Specify location for standard output, standard error.  Adjust as needed.
-#BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.tensorflow.out
-#BSUB -e /linkhome/rech/grpgen/ubx31mc/%J.tensorflow.err
+#BSUB -W 1000
+#BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.train.out
+#BSUB -e /linkhome/rech/grpgen/ubx31mc/%J.train.err
 
 ml anaconda/py3 cudnn nccl
 source activate tensorflow1.8-py3
@@ -119,6 +119,7 @@ do
     CUDA="export CUDA_VISIBLE_DEVICES='0,1,2,3'; "
     ARG_GPU=" --num_gpu 4"
     blaunch -no-wait -z $host "${EXPORT}${CWD}${TF_CONFIG}${CUDA}${EXEC}${ARG_GPU} &> ${REDIRECT}" &
+    sleep 3
   else
     # launch worker
     let worker_index=$index-1

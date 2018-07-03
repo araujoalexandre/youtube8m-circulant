@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#BSUB -J test
+#BSUB -J eval
 #BSUB -gpu "num=4:mode=exclusive_process:mps=no:j_exclusive=yes"
 #BSUB -n 1
-# Specify location for standard output, standard error.  Adjust as needed.
-#BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.tensorflow.out
-#BSUB -e /linkhome/rech/grpgen/ubx31mc/%J.tensorflow.err
+#BSUB -W 1000
+#BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.eval.out
+#BSUB -e /linkhome/rech/grpgen/ubx31mc/%J.eval.err
 
 ml anaconda/py3 cudnn nccl
 source activate tensorflow1.8-py3
@@ -20,4 +20,3 @@ $EXPORT; python3 ${EXEC_DIR}/eval.py \
 --train_dir ${TRAIN_DIR} \
 --eval_data_pattern=${WORKDIR}/yt8m/${DATA_TYPE}/valid*.tfrecord \
 --num_readers 100 &> $TRAIN_DIR_LOG &
-
