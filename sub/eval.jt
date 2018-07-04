@@ -13,8 +13,8 @@ source activate tensorflow1.8-py3
 DATA_TYPE="frame"
 TRAIN_DIR="${WORKDIR}/yt8m_models/${DATA_TYPE}/2018-07-02_18.00"
 
-# train dir should be updated in the config/restart.cfg file
-EVAL_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/restart.cfg"
+# train dir should be updated in the config/eval.cfg file
+EVAL_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/eval.cfg"
 TRAIN_DIR=$(head $EVAL_CONFIG_FILE --lines 1)
 
 # exec folder should be updated in the config/exec.cfg file
@@ -27,4 +27,5 @@ EXPORT="export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwr
 $EXPORT; python3 ${EXEC_DIR}/eval.py \
 --train_dir ${TRAIN_DIR} \
 --eval_data_pattern=${WORKDIR}/yt8m/${DATA_TYPE}/valid*.tfrecord \
---num_readers 100 &>> $TRAIN_DIR_LOG &
+--num_readers 100 \
+--run_once &>> $TRAIN_DIR_LOG &
