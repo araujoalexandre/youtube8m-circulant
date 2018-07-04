@@ -1,0 +1,31 @@
+#!/bin/bash
+
+#BSUB -J inference
+#BSUB -gpu "num=4:mode=exclusive_process:mps=no:j_exclusive=yes"
+#BSUB -n 1
+#BSUB -W 1000
+#BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.eval.out
+#BSUB -e /linkhome/rech/grpgen/ubx31mc/%J.eval.err
+
+ml anaconda/py3 cudnn nccl
+source activate tensorflow1.8-py3
+
+# train dir should be updated in the config/eval.cfg file
+CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/inference.cfg"
+DATA_TYPE=$(head $CONFIG_FILE --lines 1)
+SUBMIT_NAME=$(head $CONFIG_FILE --lines 2 | tail --lines 1)
+TRAIN_DIR=$(tail $CONFIG_FILE --lines 1)
+
+# exec folder should be updated in the config/exec.cfg file
+EXEC_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/exec.cfg"
+EXEC_DIR=$(head $EXEC_CONFIG_FILE --lines 1)
+
+TRAIN_DIR_LOG+=$TRAIN_DIR"_logs/log_inference.logs"
+EXPORT="export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwrlocal/pub/cudnn/7.1.4/lib64:/pwrlocal/pub/nccl/2.2.13-1/lib:$LD_LIBRARY_PATH; "
+
+$EXPORT; python3 ${EXEC_DIR}-8m/inference.py \
+--train_dir ${TRAIN_DIR} \
+--output_file ${TRAIN_DIR}/${SUBMIT_NAME} \
+--input_data_pattern=${WORKDIR}/yt8m/frame/test*.tfrecord \
+--batch_size 1024 \
+--num_readers 80 &>> $TRAIN_DIR_LOG
