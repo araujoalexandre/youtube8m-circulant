@@ -23,7 +23,7 @@ EXEC_DIR=$(head $EXEC_CONFIG_FILE --lines 1)
 TRAIN_DIR_LOG+=$TRAIN_DIR"_logs/log_inference.logs"
 EXPORT="export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwrlocal/pub/cudnn/7.1.4/lib64:/pwrlocal/pub/nccl/2.2.13-1/lib:$LD_LIBRARY_PATH; "
 
-$EXPORT; python3 ${EXEC_DIR}-8m/inference.py \
+$EXPORT; python3 ${EXEC_DIR}/inference.py \
 --train_dir ${TRAIN_DIR} \
 --output_file ${TRAIN_DIR}/${SUBMIT_NAME} \
 --input_data_pattern=${WORKDIR}/yt8m/frame/test*.tfrecord \
