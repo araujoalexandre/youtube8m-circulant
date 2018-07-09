@@ -418,39 +418,23 @@ class Trainer(object):
         predictions = tf.get_collection("predictions")[0]
         labels = tf.get_collection("labels")[0]
         train_op = tf.get_collection("train_op")[0]
-        # init_op = tf.global_variables_initializer()
+        init_op = tf.global_variables_initializer()
 
-      # log the size of trainable variables.
-      total = 0
-      for var in tf.trainable_variables():
-        var_size = 1
-        for x in var.get_shape():
-          var_size *= x.value
-        msg = 'Variable {}, shape {}, size {}'.format(
-          var.name, var.shape, var_size)
-        tf.logging.info('{}'.format(msg))
-        total += var_size
-      tf.logging.info('Total parameters : {}'.format(total))
-
-      summary_writer = tf.summary.FileWriter(self.train_dir, graph)
-
-    params = dict(
-        master=target,
+    sv = tf.train.Supervisor(
+        graph,
+        logdir=self.train_dir,
+        init_op=init_op,
         is_chief=self.is_master,
-        checkpoint_dir=self.train_dir,
-        scaffold=saver,
-        save_checkpoint_secs=10 * 60,
+        global_step=global_step,
+        save_model_secs=15 * 60,
         save_summaries_secs=120,
-        config=self.config,
-        stop_grace_period_secs=120,
-        log_step_count_steps=100,
-    )
+        saver=saver)
 
     logging.info("%s: Starting managed session.", task_as_string(self.task))
-    with tf.train.MonitoredTrainingSession(**params) as sess:
+    with sv.managed_session(target, config=self.config) as sess:
       try:
         logging.info("%s: Entering training loop.", task_as_string(self.task))
-        while (not sess.should_stop()) and (not self.max_steps_reached):
+        while (not sv.should_stop()) and (not self.max_steps_reached):
           batch_start_time = time.time()
           _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
               [train_op, global_step, loss, predictions, labels])
@@ -469,23 +453,22 @@ class Trainer(object):
             eval_end_time = time.time()
             eval_time = eval_end_time - eval_start_time
 
-            train_msg = ("training step {} | Loss: {:.3f} Examples/sec: {:.2f}"
-                          " | Hit@1: {:.2f} PERR: {.2f} GAP: {.2f}")
-            train_msg = train_msg.format(str(global_step_val), loss_val, 
-                            examples_per_second, hit_at_one, perr, gap)
-            logging.info(train_msg)
+            logging.info("training step " + str(global_step_val) + " | Loss: " + ("%.2f" % loss_val) +
+              " Examples/sec: " + ("%.2f" % examples_per_second) + " | Hit@1: " +
+              ("%.2f" % hit_at_one) + " PERR: " + ("%.2f" % perr) +
+              " GAP: " + ("%.2f" % gap))
 
-            summary_writer.add_summary(
+            sv.summary_writer.add_summary(
                 utils.MakeSummary("model/Training_Hit@1", hit_at_one),
                 global_step_val)
-            summary_writer.add_summary(
+            sv.summary_writer.add_summary(
                 utils.MakeSummary("model/Training_Perr", perr), global_step_val)
-            summary_writer.add_summary(
+            sv.summary_writer.add_summary(
                 utils.MakeSummary("model/Training_GAP", gap), global_step_val)
-            summary_writer.add_summary(
+            sv.summary_writer.add_summary(
                 utils.MakeSummary("global_step/Examples/Second",
                                   examples_per_second), global_step_val)
-            summary_writer.flush()
+            sv.summary_writer.flush()
 
             # Exporting the model every x steps
             time_to_export = ((self.last_model_export_step == 0) or
@@ -493,19 +476,17 @@ class Trainer(object):
                  >= self.export_model_steps))
 
             if self.is_master and time_to_export:
-              self.export_model(global_step_val, saver, self.train_dir, sess)
+              self.export_model(global_step_val, sv.saver, sv.save_path, sess)
               self.last_model_export_step = global_step_val
           else:
-            train_msg = "training step {} | Loss: {:.3f} Examples/sec: {:.2f}"
-            train_msg = train_msg.format(str(global_step_val), loss_val, 
-                            examples_per_second)
-            logging.info(train_msg)
-      
+            logging.info("training step " + str(global_step_val) + " | Loss: " +
+              ("%.2f" % loss_val) + " Examples/sec: " + ("%.2f" % examples_per_second))
       except tf.errors.OutOfRangeError:
         logging.info("%s: Done training -- epoch limit reached.",
                      task_as_string(self.task))
 
     logging.info("%s: Exited training loop.", task_as_string(self.task))
+    sv.Stop()
 
   def export_model(self, global_step_val, saver, save_path, session):
 
