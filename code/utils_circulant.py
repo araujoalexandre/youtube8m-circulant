@@ -10,15 +10,7 @@ class CirculantLayer:
                     tf.random_normal_initializer(stddev=1./out_dim)
 
     self.max_dim_circ_vec = input_shape[-1]
-    
-    shift = tf.eye(self.max_dim_circ_vec)
-    shift = tf.cast(tf.manip.roll(shift, 1, axis=1), dtype=tf.float32)
-
-    idx = tf.where(tf.not_equal(shift, 0))
-    self.shift_sparse = tf.SparseTensor(
-        idx, tf.gather_nd(shift, idx), shift.get_shape())
-    self.shift_sparse_to_dense = tf.sparse_tensor_to_dense(self.shift_sparse)
-    
+        
     if self.out_dim <= self.max_dim_circ_vec:
       self.w = self._get_weights('weights')
     else:
@@ -48,12 +40,12 @@ class CirculantLayer:
             )
 
   def _matmul(self, X_fft, w):
-      w = tf.cast(self.w, tf.complex64)
+      w = tf.cast(w, tf.complex64)
       fft_w = tf.fft(w[..., ::-1])
       fft_mul = tf.multiply(X_fft, fft_w)
       ifft_val = tf.ifft(fft_mul)
       mat = tf.cast(tf.real(ifft_val), tf.float32)
-      mat = tf.matmul(mat, self.shift_sparse_to_dense, b_is_sparse=True)
+      mat = tf.manip.roll(mat, shift=1, axis=1)
       return mat
     
   def matmul(self, X):
