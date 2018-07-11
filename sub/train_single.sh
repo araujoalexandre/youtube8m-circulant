@@ -21,7 +21,9 @@ cp ${CONFIG_FILE} ${LOGS_DIR}/
 
 export DATA_DIR="${DATA_PREFIX_DIR}/${DATA_TYPE}"
 
-CMD="python3 $EXEC_DIR/train.py ${PYTHON_ARGS} --num_gpu ${NUM_GPU} &>> $LOGS_DIR/out.log"
-echo "About to execute $CMD"
+CMD="python3 $EXEC_DIR/train.py ${PYTHON_ARGS} --num_gpu ${NUM_GPU} | tee $LOGS_DIR/out.log"
+echo "About to execute: $CMD"
+echo "Output file: $LOGS_DIR/out.log"
+
 eval $CMD
 
