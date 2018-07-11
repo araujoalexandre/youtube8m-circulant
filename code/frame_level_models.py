@@ -296,19 +296,15 @@ class Circulant_DbofModel(models.BaseModel):
           scale=True,
           is_training=is_training,
           scope="input_bn")
-
-    cluster_weights = tf.get_variable("cluster_weights",
-      [feature_size, cluster_size],
-      initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(feature_size)))
     
     initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(feature_size))
     input_dim = reshaped_input.get_shape().as_list()
-    circ_layer = CirculantLayer(input_dim, cluster_size, initializer)
+    circ_layer_cluster = CirculantLayer(input_dim, cluster_size, initializer)
 
-    for i, weights in enumerate(circ_layer.weights):
+    for i, weights in enumerate(circ_layer_cluster.weights):
       tf.summary.histogram("circulant_cluster_weights{}".format(i), weights)
     
-    activation = circ_layer.matmul(reshaped_input)
+    activation = circ_layer_cluster.matmul(reshaped_input)
     if add_batch_norm:
       activation = slim.batch_norm(
           activation,
@@ -327,12 +323,16 @@ class Circulant_DbofModel(models.BaseModel):
 
     activation = tf.reshape(activation, [-1, max_frames, cluster_size])
     activation = utils.FramePooling(activation, FLAGS.dbof_pooling_method)
+    
+    initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(hidden1_size))
+    input_dim = activation.get_shape().as_list()
+    circ_layer_hidden = CirculantLayer(input_dim, hidden1_size, initializer)
 
-    hidden1_weights = tf.get_variable("hidden1_weights",
-      [cluster_size, hidden1_size],
-      initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(cluster_size)))
-    tf.summary.histogram("hidden1_weights", hidden1_weights)
-    activation = tf.matmul(activation, hidden1_weights)
+    for i, weights in enumerate(circ_layer_hidden.weights):
+      tf.summary.histogram("circulant_hidden1_weights{}".format(i), weights)
+    
+    activation = circ_layer_hidden.matmul(activation)
+
     if add_batch_norm:
       activation = slim.batch_norm(
           activation,
@@ -346,6 +346,7 @@ class Circulant_DbofModel(models.BaseModel):
         initializer = tf.random_normal_initializer(stddev=0.01))
       tf.summary.histogram("hidden1_biases", hidden1_biases)
       activation += hidden1_biases
+    
     activation = tf.nn.relu6(activation)
     tf.summary.histogram("hidden1_output", activation)
 
