@@ -420,6 +420,19 @@ class Trainer(object):
         train_op = tf.get_collection("train_op")[0]
         init_op = tf.global_variables_initializer()
 
+    # log the size of trainable variables.
+    total = 0
+    for var in tf.trainable_variables():
+      var_size = 1
+      for x in var.get_shape():
+        var_size *= x.value
+      msg = 'var {}, shape {}, size {}'.format(
+        var.name, var.shape, var_size)
+      tf.logging.info('{}'.format(msg))
+      total += var_size
+    tf.logging.info('Total parameters : {}'.format(total))
+
+
     sv = tf.train.Supervisor(
         graph,
         logdir=self.train_dir,
