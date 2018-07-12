@@ -56,10 +56,14 @@ def print_tensors_in_checkpoint_file(file_name, tensor_name, all_tensors,
     elif not tensor_name:
       var = reader.debug_string().decode("utf-8")
       total_params = 0
-      for params in re.findall('\[[0-9,]+\]', var):
+      filtered_var = ''
+      for line in var.split('\n'):
+        if 'Adam' not in line:
+          filtered_var += '{}\n'.format(line)
+      for params in re.findall('\[[0-9,]+\]', filtered_var):
         params = params.replace('[', '').replace(']', '').split(',')
         total_params += np.prod([int(x) for x in params])
-      print(reader.debug_string().decode("utf-8"))
+      print(filtered_var)
       print('total parameters = {}'.format(total_params))
     else:
       print("tensor_name: ", tensor_name)
