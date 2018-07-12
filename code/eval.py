@@ -118,7 +118,7 @@ def build_graph(reader,
     num_readers: How many threads to use for I/O operations.
   """
 
-  global_step = tf.Variable(0, trainable=False, name="global_step")
+  global_step = tf.train.get_or_create_global_step()
   video_id_batch, model_input_raw, labels_batch, num_frames = get_input_evaluation_tensors(  # pylint: disable=g-line-too-long
       reader,
       eval_data_pattern,
