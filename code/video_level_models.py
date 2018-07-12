@@ -133,7 +133,7 @@ class Circulant_MoeModel(models.BaseModel):
     num_mixtures = num_mixtures or FLAGS.moe_num_mixtures
     model_input_dim = model_input.get_shape().as_list()
 
-    with tf.name_scope('circulant_gates') as scope:
+    with tf.variable_scope('circulant_gates') as scope:
 
       gate_activations_size = vocab_size * (num_mixtures + 1)
       initializer = tf.random_normal_initializer(
@@ -143,7 +143,7 @@ class Circulant_MoeModel(models.BaseModel):
 
       gate_activations = circ_gate_activations.matmul(model_input)
 
-    with tf.name_scope('circulant_expert') as scope:
+    with tf.variable_scope('circulant_expert') as scope:
 
       expert_activations_size = vocab_size * num_mixtures
       initializer = tf.random_normal_initializer(
@@ -156,7 +156,7 @@ class Circulant_MoeModel(models.BaseModel):
       initializer = tf.constant_initializer(1/math.sqrt(expert_activations_size))
       biases = tf.get_variable(
                 name='biases',
-                shape=(1, expert_activations_size),
+                shape=(expert_activations_size),
                 dtype=tf.float32,
                 initializer=initializer,
                 trainable=True)
