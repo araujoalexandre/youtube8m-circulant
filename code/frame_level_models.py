@@ -34,6 +34,7 @@ flags.DEFINE_bool(
     "sample_random_frames", True,
     "If true samples random frames (for frame level models). If false, a random"
     "sequence of frames is sampled instead.")
+
 flags.DEFINE_integer("dbof_cluster_size", 8192,
                      "Number of units in the DBoF cluster layer.")
 flags.DEFINE_integer("dbof_hidden_size", 1024,
@@ -41,12 +42,61 @@ flags.DEFINE_integer("dbof_hidden_size", 1024,
 flags.DEFINE_string("dbof_pooling_method", "max",
                     "The pooling method used in the DBoF cluster layer. "
                     "Choices are 'average' and 'max'.")
+
+flags.DEFINE_integer("netvlad_cluster_size", 8192,
+                     "Number of units in the Netvlad cluster layer.")
+flags.DEFINE_integer("netvlad_hidden_size", 1024,
+                     "Number of units in the Netvlad hidden layer.")
+flags.DEFINE_string("netvlad_gating", True,
+                    "Activate Context Gating layer after Netvlad clustering.")
+
 flags.DEFINE_string("video_level_classifier_model", "MoeModel",
                     "Some Frame-Level models can be decomposed into a "
                     "generalized pooling operation followed by a "
                     "classifier layer")
+
 flags.DEFINE_integer("lstm_cells", 1024, "Number of LSTM cells.")
 flags.DEFINE_integer("lstm_layers", 2, "Number of LSTM layers.")
+
+def context_gating(input_layer, add_batch_norm=None, is_training=True):
+  """Context Gating
+     https://github.com/antoine77340/LOUPE/blob/master/loupe.py#L59
+
+    Args:
+      input_layer: Input layer in the following shape:
+      'batch_size' x 'number_of_activation'
+    Returns:
+      activation: gated layer in the following shape:
+      'batch_size' x 'number_of_activation'
+  """
+  add_batch_norm = add_batch_norm or FLAGS.add_batch_norm
+
+  input_dim = input_layer.get_shape().as_list()[1] 
+  
+  gating_weights = tf.get_variable("gating_weights",
+    [input_dim, input_dim],
+    initializer = tf.random_normal_initializer(
+    stddev=1 / math.sqrt(input_dim)))
+  
+  gates = tf.matmul(input_layer, gating_weights)
+
+  if add_batch_norm:
+    gates = slim.batch_norm(
+        gates,
+        center=True,
+        scale=True,
+        is_training=is_training,
+        scope="gating_bn")
+  else:
+    gating_biases = tf.get_variable("gating_biases",
+      [input_dim],
+      initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(input_dim)))
+    gates += gating_biases
+
+  gates = tf.sigmoid(gates)
+  activation = tf.multiply(input_layer,gates)
+  return activation
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -236,6 +286,105 @@ class LstmModel(models.BaseModel):
         vocab_size=vocab_size,
         **unused_params)
 
+class NetvladModel(models.BaseModel):
+  """NetVlad poolind Layer"""
+
+  def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_frames,
+                   iterations=None,
+                   add_batch_norm=None,
+                   sample_random_frames=None,
+                   cluster_size=None,
+                   hidden_size=None,
+                   is_training=True,
+                   gating=None,
+                   **unused_params):
+
+    iterations = iterations or FLAGS.iterations
+    add_batch_norm = add_batch_norm or FLAGS.dbof_add_batch_norm
+    random_frames = sample_random_frames or FLAGS.sample_random_frames
+    cluster_size = cluster_size or FLAGS.netvlad_cluster_size
+    hidden1_size = hidden_size or FLAGS.netvlad_hidden_size
+    context_gating = gating or FLAGS.context_gating
+
+
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+    if random_frames:
+      model_input = utils.SampleRandomFrames(model_input, num_frames,
+                                             iterations)
+    else:
+      model_input = utils.SampleRandomSequence(model_input, num_frames,
+                                               iterations)
+    max_frames = model_input.get_shape().as_list()[1]
+    feature_size = model_input.get_shape().as_list()[2]
+    reshaped_input = tf.reshape(model_input, [-1, feature_size])
+    tf.summary.histogram("input_hist", reshaped_input)
+
+    # Netvlad layer from :
+    # https://github.com/antoine77340/LOUPE/blob/master/loupe.py
+
+    cluster_weights = tf.get_variable("cluster_weights",
+          [feature_size, cluster_size],
+          initializer = tf.random_normal_initializer(
+          stddev=1 / math.sqrt(feature_size)))
+
+    activation = tf.matmul(reshaped_input, cluster_weights)
+
+    if add_batch_norm:
+      activation = slim.batch_norm(
+          activation,
+          center=True,
+          scale=True,
+          is_training=is_training,
+          scope="cluster_bn")
+    else:
+      cluster_biases = tf.get_variable("cluster_biases", [cluster_size],
+        initializer = tf.random_normal_initializer(
+        stddev=1 / math.sqrt(self.feature_size)))
+      activation += cluster_biases
+
+    activation = tf.nn.softmax(activation)
+
+    activation = tf.reshape(activation,
+            [-1, max_frames, cluster_size])
+
+    a_sum = tf.reduce_sum(activation, -2, keep_dims=True)
+
+    cluster_weights2 = tf.get_variable("cluster_weights2",
+            [1, feature_size, cluster_size], 
+            initializer = tf.random_normal_initializer(
+            stddev=1 / math.sqrt(feature_size)))
+
+    a = tf.multiply(a_sum, cluster_weights2)
+
+    activation = tf.transpose(activation, perm=[0,2,1])
+
+    reshaped_input = tf.reshape(reshaped_input,
+            [-1, max_frames, feature_size])
+
+    vlad = tf.matmul(activation,reshaped_input)
+    vlad = tf.transpose(vlad, perm=[0,2,1])
+    vlad = tf.subtract(vlad, a)
+
+    vlad = tf.nn.l2_normalize(vlad,1)
+
+    vlad = tf.reshape(vlad,[-1, cluster_size * feature_size])
+    vlad = tf.nn.l2_normalize(vlad, 1)
+
+    hidden1_weights = tf.get_variable("hidden1_weights",
+      [cluster_size * feature_size, hidden_size],
+      initializer=tf.random_normal_initializer(
+      stddev=1 / math.sqrt(cluster_size)))
+       
+    vlad = tf.matmul(vlad, hidden1_weights)
+
+    if gating:
+        vlad = context_gating(vlad, add_batch_norm, is_training)
+
+    return vlad
+
 
 class Circulant_DbofModel(models.BaseModel):
   """Creates a Deep Bag of Frames model.
@@ -356,3 +505,4 @@ class Circulant_DbofModel(models.BaseModel):
         model_input=activation,
         vocab_size=vocab_size,
         **unused_params)
+
