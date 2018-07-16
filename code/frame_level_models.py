@@ -383,7 +383,12 @@ class NetvladModel(models.BaseModel):
     if gating:
         vlad = context_gating(vlad, add_batch_norm, is_training)
 
-    return vlad
+    aggregated_model = getattr(video_level_models,
+                               FLAGS.video_level_classifier_model)
+    return aggregated_model().create_model(
+        model_input=vlad,
+        vocab_size=vocab_size,
+        **unused_params)
 
 
 class Circulant_DbofModel(models.BaseModel):
