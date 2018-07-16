@@ -2,7 +2,7 @@
 
 #BSUB -J training
 #BSUB -gpu "num=4:mode=exclusive_process:mps=no:j_exclusive=yes"
-#BSUB -n 8,11
+#BSUB -n 3
 #BSUB -R "span[ptile=1]"
 #BSUB -W 1000
 #BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.train.out
@@ -17,7 +17,7 @@ source activate tensorflow1.8-py3
 # --args2 value2 ... 
 CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/train.cfg"
 DATA_TYPE=$(head $CONFIG_FILE --lines 1)
-PYTHON_ARGS=$(tail $CONFIG_FILE -n +2 | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g')
+PYTHON_ARGS=$(tail $CONFIG_FILE -n +2 | sed '/^#/ d' | sed '/^[[:blank:]]*$/d' | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g')
 
 DATE_STR=$(date '+%Y-%m-%d_%H.%M.%S')
 
