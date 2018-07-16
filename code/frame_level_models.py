@@ -47,7 +47,7 @@ flags.DEFINE_integer("netvlad_cluster_size", 8192,
                      "Number of units in the Netvlad cluster layer.")
 flags.DEFINE_integer("netvlad_hidden_size", 1024,
                      "Number of units in the Netvlad hidden layer.")
-flags.DEFINE_string("netvlad_gating", True,
+flags.DEFINE_bool("netvlad_gating", True,
                     "Activate Context Gating layer after Netvlad clustering.")
 
 flags.DEFINE_string("video_level_classifier_model", "MoeModel",
