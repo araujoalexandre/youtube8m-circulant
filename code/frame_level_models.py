@@ -368,6 +368,7 @@ class NetVLADModel(models.BaseModel):
                    sample_random_frames=None,
                    cluster_size=None,
                    hidden_size=None,
+                   gating=None,
                    is_training=True,
                    **unused_params):
     iterations = iterations or FLAGS.iterations
@@ -375,11 +376,7 @@ class NetVLADModel(models.BaseModel):
     random_frames = sample_random_frames or FLAGS.sample_random_frames
     cluster_size = cluster_size or FLAGS.netvlad_cluster_size
     hidden1_size = hidden_size or FLAGS.netvlad_hidden_size
-    
-    relu = FLAGS.netvlad_relu
-    dimred = FLAGS.netvlad_dimred
-    gating = FLAGS.gating
-    remove_diag = FLAGS.gating_remove_diag
+    gating = FLAGS.netvlad_gating 
 
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     if random_frames:
@@ -389,15 +386,14 @@ class NetVLADModel(models.BaseModel):
       model_input = utils.SampleRandomSequence(model_input, num_frames,
                                                iterations)
     
-
     max_frames = model_input.get_shape().as_list()[1]
     feature_size = model_input.get_shape().as_list()[2]
     reshaped_input = tf.reshape(model_input, [-1, feature_size])
 
-    video_NetVLAD = NetVLAD(1024,max_frames,cluster_size, add_batch_norm, is_training)
-    audio_NetVLAD = NetVLAD(128,max_frames,cluster_size/2, add_batch_norm, is_training)
+    video_NetVLAD = NetVLAD(1024, max_frames, cluster_size, add_batch_norm, is_training)
+    audio_NetVLAD = NetVLAD(128, max_frames, cluster_size / 2, add_batch_norm, is_training)
 
-    if add_batch_norm:# and not lightvlad:
+    if add_batch_norm:
       reshaped_input = slim.batch_norm(
           reshaped_input,
           center=True,
@@ -406,12 +402,12 @@ class NetVLADModel(models.BaseModel):
           scope="input_bn")
 
     with tf.variable_scope("video_VLAD"):
-        vlad_video = video_NetVLAD.forward(reshaped_input[:,0:1024]) 
+        vlad_video = video_NetVLAD.forward(reshaped_input[:, 0:1024]) 
 
     with tf.variable_scope("audio_VLAD"):
-        vlad_audio = audio_NetVLAD.forward(reshaped_input[:,1024:])
+        vlad_audio = audio_NetVLAD.forward(reshaped_input[:, 1024:])
 
-    vlad = tf.concat([vlad_video, vlad_audio],1)
+    vlad = tf.concat([vlad_video, vlad_audio], 1)
 
     vlad_dim = vlad.get_shape().as_list()[1] 
     hidden1_weights = tf.get_variable("hidden1_weights",
