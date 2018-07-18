@@ -149,7 +149,7 @@ class NetVLAD():
 
     activation = tf.reshape(activation, [-1, self.max_frames, self.cluster_size])
 
-    a_sum = tf.reduce_sum(activation,-2,keep_dims=True)
+    a_sum = tf.reduce_sum(activation,-2, keepdims=True)
 
     cluster_weights2 = tf.get_variable("cluster_weights2",
         [1, self.feature_size, self.cluster_size],
