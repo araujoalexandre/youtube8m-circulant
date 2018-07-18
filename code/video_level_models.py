@@ -25,9 +25,10 @@ from tensorflow import flags
 import tensorflow.contrib.slim as slim
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer(
-    "moe_num_mixtures", 2,
+flags.DEFINE_integer("moe_num_mixtures", 2,
     "The number of mixtures (excluding the dummy 'expert') used for MoeModel.")
+flags.DEFINE_bool("MoE_gating", True, 
+                  """Activate Context Gating after MoE.""")
 
 class LogisticModel(models.BaseModel):
   """Logistic model with L2 regularization."""
@@ -54,8 +55,11 @@ class MoeModel(models.BaseModel):
   def create_model(self,
                    model_input,
                    vocab_size,
+                   is_training=None,
+                   add_batch_norm=None,
                    num_mixtures=None,
                    l2_penalty=1e-8,
+                   gating=None,
                    **unused_params):
     """Creates a Mixture of (Logistic) Experts model.
 
@@ -76,6 +80,7 @@ class MoeModel(models.BaseModel):
       batch_size x num_classes.
     """
     num_mixtures = num_mixtures or FLAGS.moe_num_mixtures
+    gating = gating or FLAGS.MoE_gating
 
     gate_activations = slim.fully_connected(
         model_input,
@@ -102,6 +107,10 @@ class MoeModel(models.BaseModel):
         gating_distribution[:, :num_mixtures] * expert_distribution, 1)
     final_probabilities = tf.reshape(final_probabilities_by_class_and_batch,
                                      [-1, vocab_size])
+    
+    if gating:
+      final_probabilities = context_gating(activation, add_batch_norm, is_training)  
+
     return {"predictions": final_probabilities}
 
 class Circulant_MoeModel(models.BaseModel):
