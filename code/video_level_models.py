@@ -18,7 +18,8 @@ import math
 import models
 import tensorflow as tf
 import utils
-from utils_circulant import CirculantLayer
+from utils_layer import CirculantLayer
+from utils_layer import context_gating
 
 from tensorflow import flags
 import tensorflow.contrib.slim as slim
