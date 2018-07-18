@@ -17,7 +17,7 @@ import math
 
 import models
 import tensorflow as tf
-import utils
+
 from utils_layer import CirculantLayer
 from utils_layer import context_gating
 
@@ -109,7 +109,9 @@ class MoeModel(models.BaseModel):
                                      [-1, vocab_size])
     
     if gating:
-      final_probabilities = context_gating(activation, add_batch_norm, is_training)  
+      with tf.variable_scope('gating_video_level'):
+        final_probabilities = context_gating(final_probabilities, 
+                                add_batch_norm, is_training)  
 
     return {"predictions": final_probabilities}
 

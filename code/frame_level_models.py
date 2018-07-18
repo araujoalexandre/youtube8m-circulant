@@ -207,7 +207,8 @@ class DbofModel(models.BaseModel):
     tf.summary.histogram("hidden1_output", activation)
 
     if gating:
-      activation = context_gating(activation, add_batch_norm, is_training)
+      with tf.variable_scope('gating_frame_level'):
+        activation = context_gating(activation, add_batch_norm, is_training)
 
     aggregated_model = getattr(video_level_models,
                                FLAGS.video_level_classifier_model)
@@ -349,7 +350,8 @@ class NetVLADModel(models.BaseModel):
     activation = tf.nn.relu6(activation)
    
     if gating:
-      activation = context_gating(activation, add_batch_norm, is_training)
+      with tf.variable_scope('gating_frame_level'):
+        activation = context_gating(activation, add_batch_norm, is_training)
 
     aggregated_model = getattr(video_level_models,
                                FLAGS.video_level_classifier_model)
@@ -435,9 +437,10 @@ class DoubleDbofModel(models.BaseModel):
 
     activation = tf.concat([dbof_video, dbof_audio], 1)
 
+    dim = activation.get_shape().as_list()[1]
     hidden1_weights = tf.get_variable("hidden1_weights",
-      [cluster_size, hidden1_size],
-      initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(cluster_size)))
+      [dim, hidden1_size],
+      initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(dim)))
     tf.summary.histogram("hidden1_weights", hidden1_weights)
     activation = tf.matmul(activation, hidden1_weights)
     if add_batch_norm:
@@ -457,7 +460,8 @@ class DoubleDbofModel(models.BaseModel):
     tf.summary.histogram("hidden1_output", activation)
 
     if gating:
-      activation = context_gating(activation, add_batch_norm, is_training)
+      with tf.variable_scope('gating_frame_level'):
+        activation = context_gating(activation, add_batch_norm, is_training)
 
     aggregated_model = getattr(video_level_models,
                                FLAGS.video_level_classifier_model)

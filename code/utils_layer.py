@@ -1,7 +1,7 @@
 
 import math
 
-import utils
+import model_utils as utils
 
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
