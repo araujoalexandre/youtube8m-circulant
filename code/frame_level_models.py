@@ -63,6 +63,16 @@ flags.DEFINE_string("video_level_classifier_model", "MoeModel",
 flags.DEFINE_integer("lstm_cells", 1024, "Number of LSTM cells.")
 flags.DEFINE_integer("lstm_layers", 2, "Number of LSTM layers.")
 
+flags.DEFINE_bool("input_add_batch_norm", True,
+                  "Adds batch normalization to the input model.")
+
+flags.DEFINE_integer("full_hidden_size", 1024,
+                     "Number of units in the fc layer in Double DbofD/NetVLAD model.")
+flags.DEFINE_bool("full_add_batch_norm", True,
+                  "Adds batch normalization to the Double DbofD/NetVLAD model.")
+flags.DEFINE_bool("full_gating", True,
+                  "Activate Context Gating layer after Full fc layer.")
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -502,23 +512,42 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
                    vocab_size,
                    num_frames,
                    iterations=None,
-                   add_batch_norm=None,
                    sample_random_frames=None,
-                   cluster_size=None,
+                   input_add_batch_norm=None,
+                   dbof_add_batch_norm=None,
+                   dbof_cluster_size=None,
                    dbof_hidden_size=None,
+                   dbof_gating=None,
+                   netvlad_add_batch_norm=None,
+                   netvlad_cluster_size=None,
                    netvlad_hidden_size=None,
+                   netvlad_gating=None,
+                   full_hidden_size=None,
+                   full_add_batch_norm=None,
+                   full_gating=None,
+                   moe_add_batch_norm=None,
                    is_training=True,
-                   gating=None,
                    **unused_params):
-    iterations = iterations or FLAGS.iterations
-    add_batch_norm = add_batch_norm or FLAGS.dbof_add_batch_norm
-    random_frames = sample_random_frames or FLAGS.sample_random_frames
-    cluster_size = cluster_size or FLAGS.dbof_cluster_size
-    dbof_hidden_size = dbof_hidden_size or FLAGS.dbof_hidden_size
-    netvlad_hidden_size = netvlad_hidden_size or FLAGS.netvlad_hidden_size
-    gating = gating or FLAGS.dbof_gating
 
-    full_hidden_size = dbof_hidden_size + netvlad_hidden_size
+    iterations = iterations or FLAGS.iterations
+    random_frames = sample_random_frames or FLAGS.sample_random_frames
+    input_add_batch_norm = input_add_batch_norm or FLAGS.input_add_batch_norm
+    
+    dbof_add_batch_norm = dbof_add_batch_norm or FLAGS.dbof_add_batch_norm
+    dbof_cluster_size = dbof_cluster_size or FLAGS.dbof_cluster_size
+    dbof_hidden_size = dbof_hidden_size or FLAGS.dbof_hidden_size
+    dbof_gating = dbof_gating or FLAGS.dbof_gating
+
+    netvlad_add_batch_norm = netvlad_add_batch_norm or FLAGS.netvlad_add_batch_norm
+    netvlad_cluster_size = netvlad_cluster_size or FLAGS.netvlad_cluster_size
+    netvlad_hidden_size = netvlad_hidden_size or FLAGS.netvlad_hidden_size
+    netvlad_gating = netvlad_gating or FLAGS.netvlad_gating
+
+    full_add_batch_norm = full_add_batch_norm or FLAGS.full_add_batch_norm
+    full_hidden_size = full_hidden_size or FLAGS.full_hidden_size
+    full_gating = full_gating or FLAGS.full_gating
+
+    moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
 
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     if random_frames:
@@ -532,7 +561,7 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
     reshaped_input = tf.reshape(model_input, [-1, feature_size])
     tf.summary.histogram("input_hist", reshaped_input)
 
-    if add_batch_norm:
+    if input_add_batch_norm:
       reshaped_input = slim.batch_norm(
           reshaped_input,
           center=True,
@@ -542,10 +571,10 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
 
     with tf.variable_scope('DBof'):
 
-      video_DBoF = DBof(1024, max_frames, cluster_size, 
-        FLAGS.dbof_pooling_method, add_batch_norm, is_training)
-      audio_DBoF = DBof(128, max_frames, cluster_size // 2, 
-        FLAGS.dbof_pooling_method, add_batch_norm, is_training)
+      video_DBoF = DBof(1024, max_frames, dbof_cluster_size, 
+        FLAGS.dbof_pooling_method, dbof_add_batch_norm, is_training)
+      audio_DBoF = DBof(128, max_frames, dbof_cluster_size // 2, 
+        FLAGS.dbof_pooling_method, dbof_add_batch_norm, is_training)
 
       with tf.variable_scope("video_DBoF"):
           dbof_video = video_DBoF.forward(reshaped_input[:, 0:1024]) 
@@ -563,7 +592,7 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
       
       dbof_activation = tf.matmul(dbof_activation, dbof_hidden_weights)
       
-      if add_batch_norm:
+      if dbof_add_batch_norm:
         dbof_activation = slim.batch_norm(
             dbof_activation,
             center=True,
@@ -582,8 +611,8 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
 
     with tf.variable_scope('NetVLAD'):
 
-      video_NetVLAD = NetVLAD(1024, max_frames, cluster_size, add_batch_norm, is_training)
-      audio_NetVLAD = NetVLAD(128, max_frames, cluster_size // 2, add_batch_norm, is_training)
+      video_NetVLAD = NetVLAD(1024, max_frames, netvlad_cluster_size, netvlad_add_batch_norm, is_training)
+      audio_NetVLAD = NetVLAD(128, max_frames, netvlad_cluster_size // 2, netvlad_add_batch_norm, is_training)
 
       with tf.variable_scope("video_VLAD"):
           vlad_video = video_NetVLAD.forward(reshaped_input[:, 0:1024]) 
@@ -596,11 +625,11 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
       vlad_dim = vlad.get_shape().as_list()[1] 
       vlad_hidden_weights = tf.get_variable("vlad_hidden_weights",
         [vlad_dim, netvlad_hidden_size],
-        initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(cluster_size)))
+        initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(netvlad_hidden_size)))
          
       vlad_activation = tf.matmul(vlad, vlad_hidden_weights)
 
-      if add_batch_norm:
+      if netvlad_add_batch_norm:
         vlad_activation = slim.batch_norm(
             vlad_activation,
             center=True,
@@ -628,7 +657,7 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
          
       full_activation = tf.matmul(full_activation, full_hidden_weights)
 
-      if add_batch_norm:
+      if full_add_batch_norm:
         full_activation = slim.batch_norm(
             full_activation,
             center=True,
@@ -645,9 +674,9 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
       full_activation = tf.nn.relu6(full_activation)
       tf.summary.histogram("vlad_hidden_output", full_activation)
 
-    if gating:
+    if full_gating:
       with tf.variable_scope('gating_frame_level'):
-        full_activation = context_gating(full_activation, add_batch_norm, is_training)
+        full_activation = context_gating(full_activation, full_add_batch_norm, is_training)
 
     aggregated_model = getattr(video_level_models,
                                FLAGS.video_level_classifier_model)
@@ -655,7 +684,7 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
         model_input=full_activation,
         vocab_size=vocab_size,
         is_training=is_training,
-        add_batch_norm=add_batch_norm,
+        add_batch_norm=moe_add_batch_norm,
         **unused_params)
 
 
