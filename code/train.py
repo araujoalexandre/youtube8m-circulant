@@ -218,28 +218,6 @@ def build_graph(reader,
     num_epochs: How many passes to make over the data. 'None' means an
                 unlimited number of passes.
   """
-  logging.info('############## PARAMETERS ##############################')
-  logging.info("feature_names {}".format(FLAGS.feature_names))
-  logging.info("feature_sizes {}".format(FLAGS.feature_sizes))
-  logging.info("frame_features {}".format(FLAGS.frame_features))
-  logging.info("model {}".format(FLAGS.model))
-  logging.info("start_new_model {}".format(FLAGS.start_new_model))
-  logging.info("num_gpu {}".format(FLAGS.num_gpu))
-  logging.info("batch_size {}".format(FLAGS.batch_size))
-  logging.info("label_loss {}".format(FLAGS.label_loss))
-  logging.info("regularization_penalty {}".format(FLAGS.regularization_penalty))
-  logging.info("base_learning_rate {}".format(FLAGS.base_learning_rate))
-  logging.info("learning_rate_decay {}".format(FLAGS.learning_rate_decay))
-  logging.info("learning_rate_decay_examples {}".format(FLAGS.learning_rate_decay_examples))
-  logging.info("num_epochs {}".format(FLAGS.num_epochs))
-  logging.info("max_steps {}".format(FLAGS.max_steps))
-  logging.info("export_model_steps {}".format(FLAGS.export_model_steps))
-  logging.info("num_readers {}".format(FLAGS.num_readers))
-  logging.info("optimizer {}".format(FLAGS.optimizer))
-  logging.info("clip_gradient_norm {}".format(FLAGS.clip_gradient_norm))
-  logging.info('########################################################')
-  logging.info(' '.join([x for x in sys.argv]))
-
   # global_step = tf.train.get_or_create_global_step()
   global_step = tf.Variable(0, trainable=False, name="global_step")
 
@@ -399,6 +377,28 @@ class Trainer(object):
 
     if not os.path.exists(self.train_dir):
       os.makedirs(self.train_dir)
+
+    logging.info('############## PARAMETERS ##############################')
+    logging.info("feature_names {}".format(FLAGS.feature_names))
+    logging.info("feature_sizes {}".format(FLAGS.feature_sizes))
+    logging.info("frame_features {}".format(FLAGS.frame_features))
+    logging.info("model {}".format(FLAGS.model))
+    logging.info("start_new_model {}".format(FLAGS.start_new_model))
+    logging.info("num_gpu {}".format(FLAGS.num_gpu))
+    logging.info("batch_size {}".format(FLAGS.batch_size))
+    logging.info("label_loss {}".format(FLAGS.label_loss))
+    logging.info("regularization_penalty {}".format(FLAGS.regularization_penalty))
+    logging.info("base_learning_rate {}".format(FLAGS.base_learning_rate))
+    logging.info("learning_rate_decay {}".format(FLAGS.learning_rate_decay))
+    logging.info("learning_rate_decay_examples {}".format(FLAGS.learning_rate_decay_examples))
+    logging.info("num_epochs {}".format(FLAGS.num_epochs))
+    logging.info("max_steps {}".format(FLAGS.max_steps))
+    logging.info("export_model_steps {}".format(FLAGS.export_model_steps))
+    logging.info("num_readers {}".format(FLAGS.num_readers))
+    logging.info("optimizer {}".format(FLAGS.optimizer))
+    logging.info("clip_gradient_norm {}".format(FLAGS.clip_gradient_norm))
+    logging.info('########################################################')
+    logging.info(' '.join([x for x in sys.argv]))
 
     model_flags_dict = {
         "model": FLAGS.model,
