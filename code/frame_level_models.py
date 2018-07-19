@@ -76,7 +76,9 @@ flags.DEFINE_bool("full_gating", True,
 flags.DEFINE_bool('moe_add_batch_norm', True, 
                   "Adds batch normalization to the MoE Layer.")
 
-k_factor
+flags.DEFINE_integer('k_factor', 1, 
+                  "k_factor for circulant layer.")
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -843,22 +845,26 @@ class CirculantWithFactor_DoubleDbofModel(models.BaseModel):
                    vocab_size,
                    num_frames,
                    iterations=None,
-                   add_batch_norm=None,
+                   input_add_batch_norm=None,
+                   dbof_add_batch_norm=None,
                    sample_random_frames=None,
                    cluster_size=None,
                    hidden_size=None,
                    is_training=True,
                    gating=None,
+                   moe_add_batch_norm=None,
                    k_factor=None,
                    **unused_params):
     
     iterations = iterations or FLAGS.iterations
-    add_batch_norm = add_batch_norm or FLAGS.dbof_add_batch_norm
     random_frames = sample_random_frames or FLAGS.sample_random_frames
+    input_add_batch_norm = input_add_batch_norm or FLAGS.input_add_batch_norm
+    dbof_add_batch_norm = dbof_add_batch_norm or FLAGS.dbof_add_batch_norm
     cluster_size = cluster_size or FLAGS.dbof_cluster_size
     hidden1_size = hidden_size or FLAGS.dbof_hidden_size
     gating = gating or FLAGS.dbof_gating
     k_factor = k_factor or FLAGS.k_factor
+    moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
 
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     if random_frames:
@@ -872,7 +878,7 @@ class CirculantWithFactor_DoubleDbofModel(models.BaseModel):
     reshaped_input = tf.reshape(model_input, [-1, feature_size])
     tf.summary.histogram("input_hist", reshaped_input)
 
-    if add_batch_norm:
+    if input_add_batch_norm:
       reshaped_input = slim.batch_norm(
           reshaped_input,
           center=True,
@@ -880,15 +886,14 @@ class CirculantWithFactor_DoubleDbofModel(models.BaseModel):
           is_training=is_training,
           scope="input_bn")
 
-
     with tf.variable_scope("video_DBoF"):
       video_DBoF = DBof(1024, max_frames, cluster_size, 
-                      FLAGS.dbof_pooling_method, add_batch_norm, is_training)
+                      FLAGS.dbof_pooling_method, dbof_add_batch_norm, is_training)
       dbof_video = video_DBoF.forward(reshaped_input[:, 0:1024]) 
 
     with tf.variable_scope("audio_DBoF"):
       audio_DBoF = DBof(128, max_frames, cluster_size // 2, 
-                        FLAGS.dbof_pooling_method, add_batch_norm, is_training)
+                        FLAGS.dbof_pooling_method, dbof_add_batch_norm, is_training)
       dbof_audio = audio_DBoF.forward(reshaped_input[:, 1024:])
 
     activation = tf.concat([dbof_video, dbof_audio], 1)
@@ -900,7 +905,7 @@ class CirculantWithFactor_DoubleDbofModel(models.BaseModel):
                   k_factor=k_factor, initializer=initializer)
       activation = circ_layer_hidden.matmul(activation)
 
-    if add_batch_norm:
+    if dbof_add_batch_norm:
       activation = slim.batch_norm(
           activation,
           center=True,
@@ -919,7 +924,7 @@ class CirculantWithFactor_DoubleDbofModel(models.BaseModel):
 
     if gating:
       with tf.variable_scope('gating_frame_level'):
-        activation = context_gating(activation, add_batch_norm, is_training)
+        activation = context_gating(activation, dbof_add_batch_norm, is_training)
 
     aggregated_model = getattr(video_level_models,
                                FLAGS.video_level_classifier_model)
@@ -927,5 +932,5 @@ class CirculantWithFactor_DoubleDbofModel(models.BaseModel):
         model_input=activation,
         vocab_size=vocab_size,
         is_training=is_training,
-        add_batch_norm=add_batch_norm,
+        add_batch_norm=moe_add_batch_norm,
         **unused_params)
