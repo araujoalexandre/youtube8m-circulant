@@ -38,4 +38,5 @@ cp ${CONFIG_FILE} ${LOGS_DIR}/
 export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwrlocal/pub/cudnn/7.1.4/lib64:/pwrlocal/pub/nccl/2.2.13-1/lib:$LD_LIBRARY_PATH
 export TRAIN_DIR=${TRAIN_DIR}; export DATA_DIR=${DATA_DIR};
 export CUDA_VISIBLE_DEVICES='0,1,2,3';
-python3 ${EXEC_DIR}/train.py ${PYTHON_ARGS} --num_gpu 4 &>> ${LOGS_DIR}/log_master_0.logs &
+exec="python3 ${EXEC_DIR}/train.py ${PYTHON_ARGS} --num_gpu 4 &>> ${LOGS_DIR}/log_master_0.logs &"
+eval $exec
