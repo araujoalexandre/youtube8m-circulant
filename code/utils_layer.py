@@ -115,7 +115,7 @@ class CirculantLayerWithFactor:
     self.out_dim = out_dim
     self.k_factor = k_factor
     self.initializer = initializer
-    self.max_dim = input_shape[-1].value
+    self.max_dim = input_shape[-1]
             
     dim = 0
     self.parameters = []
@@ -123,7 +123,7 @@ class CirculantLayerWithFactor:
     while dim < self.out_dim:
       factor = []
       for k in range(self.k_factor):
-        w = self._get_weights('weights_circ{}_f{}'.format(count, k)), 
+        w = self._get_weights('weights_circ{}_f{}'.format(count, k))
         d = self._get_weights('weights_diag{}_f{}'.format(count, k))
         factor.append((w, d))
       count += 1
@@ -138,7 +138,7 @@ class CirculantLayerWithFactor:
                 initializer=self.initializer,
                 trainable=True)
 
-  def CirculantLayer(self, X):
+  def matmul(self, X):
     mat = []
     batch_size = X.get_shape()[0]
     for params in self.parameters:
@@ -149,10 +149,10 @@ class CirculantLayerWithFactor:
         fft2 = tf.spectral.rfft(weights[..., ::-1])
         fft_mul = tf.multiply(fft1, fft2)
         ifft_val = tf.spectral.irfft(fft_mul)
-        ret = tf.cast(tf.real(ifft_val), tf.float32)                
-        ret = tf.manip.roll(ret, 1, axis=1)              
+        ret = tf.cast(tf.real(ifft_val), tf.float32)
+        ret = tf.manip.roll(ret, 1, axis=1)
       mat.append(ret)
-    return tf.concat(mat, axis=1)[..., self.out_dim]
+    return tf.concat(mat, axis=1)[..., :self.out_dim]
 
 class NetVLAD():
   """
