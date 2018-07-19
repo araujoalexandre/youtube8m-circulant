@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#BSUB -J training
+#BSUB -J restart
 #BSUB -gpu "num=4:mode=exclusive_process:mps=no:j_exclusive=yes"
 #BSUB -n 3
 #BSUB -R "span[ptile=1]"

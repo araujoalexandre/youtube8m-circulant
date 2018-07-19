@@ -1,0 +1,37 @@
+#!/bin/bash
+
+#BSUB -J restart
+#BSUB -gpu "num=4:mode=exclusive_process:mps=no:j_exclusive=yes"
+#BSUB -n 3
+#BSUB -R "span[ptile=1]"
+#BSUB -W 1000
+#BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.train.out
+#BSUB -e /linkhome/rech/grpgen/ubx31mc/%J.train.err
+
+ml anaconda/py3 cudnn nccl
+source activate tensorflow1.8-py3
+
+# train dir should be updated in the config_restart file
+RESTART_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/restart.cfg"
+TRAIN_DIR=$(head $RESTART_CONFIG_FILE --lines 1)
+LOGS_DIR="${TRAIN_DIR}_logs"
+
+# config file start with the data type on the first line [video | frame]
+# the exec args can be parse from the second line :
+# --args1 value1 \
+# --args2 value2 ... 
+CONFIG_FILE="${LOGS_DIR}/train.cfg"
+DATA_TYPE=$(head $CONFIG_FILE --lines 1)
+PYTHON_ARGS=$(tail $CONFIG_FILE -n +2 | sed '/^#/ d' | sed '/^[[:blank:]]*$/d' | sed -e ':a' -e 'N' -e '$!ba' -e 's/\\\n/ /g' | sed -e 's/--start_new_model//g')
+
+# exec folder should be updated in the config/exec.cfg file
+EXEC_CONFIG_FILE="/linkhome/rech/grpgen/ubx31mc/kaggle_yt8m/config/exec.cfg"
+EXEC_DIR=$(head $EXEC_CONFIG_FILE --lines 1)
+
+DATA_DIR="/pwrwork/rech/jvd/ubx31mc/yt8m/${DATA_TYPE}"
+
+
+export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwrlocal/pub/cudnn/7.1.4/lib64:/pwrlocal/pub/nccl/2.2.13-1/lib:$LD_LIBRARY_PATH
+export TRAIN_DIR=${TRAIN_DIR}; export DATA_DIR=${DATA_DIR};
+export CUDA_VISIBLE_DEVICES='0,1,2,3';
+python3 ${EXEC_DIR}/train.py ${PYTHON_ARGS} --num_gpu 4 &>> ${LOGS_DIR}/log_master_0.logs &
