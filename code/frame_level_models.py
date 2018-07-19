@@ -654,7 +654,7 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
 
     with tf.variable_scope('merge_dbof_netvlad'):
 
-      full_activation_dim = vlad.get_shape().as_list()[1] 
+      full_activation_dim = full_activation.get_shape().as_list()[1] 
       full_hidden_weights = tf.get_variable("full_hidden_weights",
         [full_activation_dim, full_hidden_size],
         initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(full_hidden_size)))
