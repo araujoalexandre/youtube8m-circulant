@@ -110,10 +110,11 @@ class CirculantLayer:
 
 class CirculantLayerWithFactor:
     
-  def __init__(self, input_shape, out_dim, k_factor=1):
+  def __init__(self, input_shape, out_dim, k_factor=1, initializer=None):
     self.input_shape = input_shape
     self.out_dim = out_dim
     self.k_factor = k_factor
+    self.initializer = initializer
     self.max_dim = input_shape[-1].value
             
     dim = 0

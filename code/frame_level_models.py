@@ -76,7 +76,7 @@ flags.DEFINE_bool("full_gating", True,
 flags.DEFINE_bool('moe_add_batch_norm', True, 
                   "Adds batch normalization to the MoE Layer.")
 
-
+k_factor
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -815,3 +815,117 @@ class Circulant_DbofModel(models.BaseModel):
         add_batch_norm=add_batch_norm,
         **unused_params)
 
+class CirculantWithFactor_DoubleDbofModel(models.BaseModel):
+  """Creates a Deep Bag of Frames model.
+
+  The model projects the features for each frame into a higher dimensional
+  'clustering' space, pools across frames in that space, and then
+  uses a configurable video-level model to classify the now aggregated features.
+
+  The model will randomly sample either frames or sequences of frames during
+  training to speed up convergence.
+
+  Args:
+    model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
+                 input features.
+    vocab_size: The number of classes in the dataset.
+    num_frames: A vector of length 'batch' which indicates the number of
+         frames for each video (before padding).
+
+  Returns:
+    A dictionary with a tensor containing the probability predictions of the
+    model in the 'predictions' key. The dimensions of the tensor are
+    'batch_size' x 'num_classes'.
+  """
+
+  def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_frames,
+                   iterations=None,
+                   add_batch_norm=None,
+                   sample_random_frames=None,
+                   cluster_size=None,
+                   hidden_size=None,
+                   is_training=True,
+                   gating=None,
+                   k_factor=None,
+                   **unused_params):
+    
+    iterations = iterations or FLAGS.iterations
+    add_batch_norm = add_batch_norm or FLAGS.dbof_add_batch_norm
+    random_frames = sample_random_frames or FLAGS.sample_random_frames
+    cluster_size = cluster_size or FLAGS.dbof_cluster_size
+    hidden1_size = hidden_size or FLAGS.dbof_hidden_size
+    gating = gating or FLAGS.dbof_gating
+    k_factor = k_factor or FLAGS.k_factor
+
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+    if random_frames:
+      model_input = utils.SampleRandomFrames(model_input, num_frames,
+                                             iterations)
+    else:
+      model_input = utils.SampleRandomSequence(model_input, num_frames,
+                                               iterations)
+    max_frames = model_input.get_shape().as_list()[1]
+    feature_size = model_input.get_shape().as_list()[2]
+    reshaped_input = tf.reshape(model_input, [-1, feature_size])
+    tf.summary.histogram("input_hist", reshaped_input)
+
+    if add_batch_norm:
+      reshaped_input = slim.batch_norm(
+          reshaped_input,
+          center=True,
+          scale=True,
+          is_training=is_training,
+          scope="input_bn")
+
+
+    with tf.variable_scope("video_DBoF"):
+      video_DBoF = DBof(1024, max_frames, cluster_size, 
+                      FLAGS.dbof_pooling_method, add_batch_norm, is_training)
+      dbof_video = video_DBoF.forward(reshaped_input[:, 0:1024]) 
+
+    with tf.variable_scope("audio_DBoF"):
+      audio_DBoF = DBof(128, max_frames, cluster_size // 2, 
+                        FLAGS.dbof_pooling_method, add_batch_norm, is_training)
+      dbof_audio = audio_DBoF.forward(reshaped_input[:, 1024:])
+
+    activation = tf.concat([dbof_video, dbof_audio], 1)
+
+    with tf.variable_scope('circulant_fc_layer'):
+      initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(hidden1_size))
+      input_dim = activation.get_shape().as_list()
+      circ_layer_hidden = CirculantLayer(input_dim, hidden1_size, 
+                  k_factor=k_factor, initializer=initializer)
+      activation = circ_layer_hidden.matmul(activation)
+
+    if add_batch_norm:
+      activation = slim.batch_norm(
+          activation,
+          center=True,
+          scale=True,
+          is_training=is_training,
+          scope="hidden1_bn")
+    else:
+      hidden1_biases = tf.get_variable("hidden1_biases",
+        [hidden1_size],
+        initializer = tf.random_normal_initializer(stddev=0.01))
+      tf.summary.histogram("hidden1_biases", hidden1_biases)
+      activation += hidden1_biases
+    
+    activation = tf.nn.relu6(activation)
+    tf.summary.histogram("hidden1_output", activation)
+
+    if gating:
+      with tf.variable_scope('gating_frame_level'):
+        activation = context_gating(activation, add_batch_norm, is_training)
+
+    aggregated_model = getattr(video_level_models,
+                               FLAGS.video_level_classifier_model)
+    return aggregated_model().create_model(
+        model_input=activation,
+        vocab_size=vocab_size,
+        is_training=is_training,
+        add_batch_norm=add_batch_norm,
+        **unused_params)
