@@ -456,6 +456,7 @@ class DoubleDbofModel(models.BaseModel):
         initializer = tf.random_normal_initializer(stddev=0.01))
       tf.summary.histogram("hidden1_biases", hidden1_biases)
       activation += hidden1_biases
+    
     activation = tf.nn.relu6(activation)
     tf.summary.histogram("hidden1_output", activation)
 
@@ -471,6 +472,192 @@ class DoubleDbofModel(models.BaseModel):
         is_training=is_training,
         add_batch_norm=add_batch_norm,
         **unused_params)
+
+
+class DoubleDbofDoubleNetVLADModel(models.BaseModel):
+  """Creates a Deep Bag of Frames model.
+
+  The model projects the features for each frame into a higher dimensional
+  'clustering' space, pools across frames in that space, and then
+  uses a configurable video-level model to classify the now aggregated features.
+
+  The model will randomly sample either frames or sequences of frames during
+  training to speed up convergence.
+
+  Args:
+    model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
+                 input features.
+    vocab_size: The number of classes in the dataset.
+    num_frames: A vector of length 'batch' which indicates the number of
+         frames for each video (before padding).
+
+  Returns:
+    A dictionary with a tensor containing the probability predictions of the
+    model in the 'predictions' key. The dimensions of the tensor are
+    'batch_size' x 'num_classes'.
+  """
+
+  def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_frames,
+                   iterations=None,
+                   add_batch_norm=None,
+                   sample_random_frames=None,
+                   cluster_size=None,
+                   dbof_hidden_size=None,
+                   netvlad_hidden_size=None,
+                   is_training=True,
+                   gating=None,
+                   **unused_params):
+    iterations = iterations or FLAGS.iterations
+    add_batch_norm = add_batch_norm or FLAGS.dbof_add_batch_norm
+    random_frames = sample_random_frames or FLAGS.sample_random_frames
+    cluster_size = cluster_size or FLAGS.dbof_cluster_size
+    dbof_hidden_size = dbof_hidden_size or FLAGS.dbof_hidden_size
+    netvlad_hidden_size = netvlad_hidden_size or FLAGS.netvlad_hidden_size
+    gating = gating or FLAGS.dbof_gating
+
+    full_hidden_size = dbof_hidden_size + netvlad_hidden_size
+
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+    if random_frames:
+      model_input = utils.SampleRandomFrames(model_input, num_frames,
+                                             iterations)
+    else:
+      model_input = utils.SampleRandomSequence(model_input, num_frames,
+                                               iterations)
+    max_frames = model_input.get_shape().as_list()[1]
+    feature_size = model_input.get_shape().as_list()[2]
+    reshaped_input = tf.reshape(model_input, [-1, feature_size])
+    tf.summary.histogram("input_hist", reshaped_input)
+
+    if add_batch_norm:
+      reshaped_input = slim.batch_norm(
+          reshaped_input,
+          center=True,
+          scale=True,
+          is_training=is_training,
+          scope="input_bn")
+
+    with tf.variable_scope('DBof'):
+
+      video_DBoF = DBof(1024, max_frames, cluster_size, 
+        FLAGS.dbof_pooling_method, add_batch_norm, is_training)
+      audio_DBoF = DBof(128, max_frames, cluster_size // 2, 
+        FLAGS.dbof_pooling_method, add_batch_norm, is_training)
+
+      with tf.variable_scope("video_DBoF"):
+          dbof_video = video_DBoF.forward(reshaped_input[:, 0:1024]) 
+
+      with tf.variable_scope("audio_DBoF"):
+          dbof_audio = audio_DBoF.forward(reshaped_input[:, 1024:])
+
+      dbof_activation = tf.concat([dbof_video, dbof_audio], 1)
+
+      dim = dbof_activation.get_shape().as_list()[1]
+      dbof_hidden_weights = tf.get_variable("dbof_hidden_weights",
+        [dim, dbof_hidden_size],
+        initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(dim)))
+      tf.summary.histogram("dbof_hidden_weights", dbof_hidden_weights)
+      
+      dbof_activation = tf.matmul(dbof_activation, dbof_hidden_weights)
+      
+      if add_batch_norm:
+        dbof_activation = slim.batch_norm(
+            dbof_activation,
+            center=True,
+            scale=True,
+            is_training=is_training,
+            scope="hidden1_bn")
+      else:
+        dbof_hidden_biases = tf.get_variable("dbof_hidden_biases",
+          [dbof_hidden_size],
+          initializer = tf.random_normal_initializer(stddev=0.01))
+        tf.summary.histogram("dbof_hidden_biases", dbof_hidden_biases)
+        dbof_activation += dbof_hidden_biases
+      
+      dbof_activation = tf.nn.relu6(dbof_activation)
+      tf.summary.histogram("dbof_hidden_output", dbof_activation)
+
+    with tf.variable_scope('NetVLAD'):
+
+      video_NetVLAD = NetVLAD(1024, max_frames, cluster_size, add_batch_norm, is_training)
+      audio_NetVLAD = NetVLAD(128, max_frames, cluster_size // 2, add_batch_norm, is_training)
+
+      with tf.variable_scope("video_VLAD"):
+          vlad_video = video_NetVLAD.forward(reshaped_input[:, 0:1024]) 
+
+      with tf.variable_scope("audio_VLAD"):
+          vlad_audio = audio_NetVLAD.forward(reshaped_input[:, 1024:])
+
+      vlad = tf.concat([vlad_video, vlad_audio], 1)
+
+      vlad_dim = vlad.get_shape().as_list()[1] 
+      vlad_hidden_weights = tf.get_variable("vlad_hidden_weights",
+        [vlad_dim, netvlad_hidden_size],
+        initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(cluster_size)))
+         
+      vlad_activation = tf.matmul(vlad, vlad_hidden_weights)
+
+      if add_batch_norm:
+        vlad_activation = slim.batch_norm(
+            vlad_activation,
+            center=True,
+            scale=True,
+            is_training=is_training,
+            scope="netvlad_hidden_bn")
+      else:
+        netvlad_hidden_biases = tf.get_variable("netvlad_hidden_biases",
+          [netvlad_hidden_size],
+          initializer = tf.random_normal_initializer(stddev=0.01))
+        tf.summary.histogram("netvlad_hidden_biases", netvlad_hidden_biases)
+        vlad_activation += netvlad_hidden_biases
+     
+      vlad_activation = tf.nn.relu6(vlad_activation)
+      tf.summary.histogram("vlad_hidden_output", vlad_activation)
+
+    full_activation = tf.concat([dbof_activation, vlad_activation], 1)
+
+    with tf.variable_scope('merge_dbof_netvlad'):
+
+      full_activation_dim = vlad.get_shape().as_list()[1] 
+      full_hidden_weights = tf.get_variable("full_hidden_weights",
+        [full_activation_dim, full_hidden_size],
+        initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(full_hidden_size)))
+         
+      full_activation = tf.matmul(full_activation, full_hidden_weights)
+
+      if add_batch_norm:
+        full_activation = slim.batch_norm(
+            full_activation,
+            center=True,
+            scale=True,
+            is_training=is_training,
+            scope="netvlad_hidden_bn")
+      else:
+        full_hidden_biases = tf.get_variable("full_hidden_biases",
+          [netvlad_hidden_size],
+          initializer = tf.random_normal_initializer(stddev=0.01))
+        tf.summary.histogram("full_hidden_biases", full_hidden_biases)
+        full_activation += full_hidden_biases
+     
+      full_activation = tf.nn.relu6(full_activation)
+      tf.summary.histogram("vlad_hidden_output", full_activation)
+
+    if gating:
+      with tf.variable_scope('gating_frame_level'):
+        full_activation = context_gating(full_activation, add_batch_norm, is_training)
+
+    aggregated_model = getattr(video_level_models,
+                               FLAGS.video_level_classifier_model)
+    return aggregated_model().create_model(
+        model_input=full_activation,
+        vocab_size=vocab_size,
+        is_training=is_training,
+        add_batch_norm=add_batch_norm,
+        **unused_params)
+
 
 
 class Circulant_DbofModel(models.BaseModel):
