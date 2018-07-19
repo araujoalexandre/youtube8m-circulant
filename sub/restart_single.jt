@@ -2,7 +2,7 @@
 
 #BSUB -J restart
 #BSUB -gpu "num=4:mode=exclusive_process:mps=no:j_exclusive=yes"
-#BSUB -n 3
+#BSUB -n 1
 #BSUB -R "span[ptile=1]"
 #BSUB -W 1000
 #BSUB -o /linkhome/rech/grpgen/ubx31mc/%J.train.out
