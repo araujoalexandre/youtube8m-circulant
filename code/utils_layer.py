@@ -7,6 +7,44 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
 
+def context_gating(input_layer, add_batch_norm=None, is_training=True):
+  """Context Gating
+     https://github.com/antoine77340/LOUPE/blob/master/loupe.py#L59
+
+    Args:
+      input_layer: Input layer in the following shape:
+      'batch_size' x 'number_of_activation'
+    Returns:
+      activation: gated layer in the following shape:
+      'batch_size' x 'number_of_activation'
+  """
+  input_dim = input_layer.get_shape().as_list()[1] 
+  
+  gating_weights = tf.get_variable("gating_weights",
+    [input_dim, input_dim],
+    initializer = tf.random_normal_initializer(
+    stddev=1 / math.sqrt(input_dim)))
+  
+  gates = tf.matmul(input_layer, gating_weights)
+
+  if add_batch_norm:
+    gates = slim.batch_norm(
+        gates,
+        center=True,
+        scale=True,
+        is_training=is_training,
+        scope="gating_bn")
+  else:
+    gating_biases = tf.get_variable("gating_biases", [input_dim],
+      initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(input_dim)))
+    gates += gating_biases
+
+  gates = tf.nn.sigmoid(gates)
+  activation = tf.multiply(input_layer, gates)
+  return activation
+
+
+
 class CirculantLayer:
     
   def __init__(self, input_shape, out_dim, initializer=None):
@@ -70,42 +108,50 @@ class CirculantLayer:
         mat.append(ret)
       return tf.concat(mat, axis=1)[..., :self.out_dim]
 
+class CirculantLayerWithFactor:
+    
+  def __init__(self, input_shape, out_dim, k_factor=1):
+    self.input_shape = input_shape
+    self.out_dim = out_dim
+    self.k_factor = k_factor
+    self.max_dim = input_shape[-1].value
+            
+    dim = 0
+    self.parameters = []
+    count = 0
+    while dim < self.out_dim:
+      factor = []
+      for k in range(self.k_factor):
+        w = self._get_weights('weights_circ{}_f{}'.format(count, k)), 
+        d = self._get_weights('weights_diag{}_f{}'.format(count, k))
+        factor.append((w, d))
+      count += 1
+      self.parameters.append(factor)
+      dim += self.max_dim
 
-def context_gating(input_layer, add_batch_norm=None, is_training=True):
-  """Context Gating
-     https://github.com/antoine77340/LOUPE/blob/master/loupe.py#L59
+  def _get_weights(self, name=None):
+    return tf.get_variable(
+                name=name,
+                shape=(1, self.max_dim),
+                dtype=tf.float32,
+                initializer=self.initializer,
+                trainable=True)
 
-    Args:
-      input_layer: Input layer in the following shape:
-      'batch_size' x 'number_of_activation'
-    Returns:
-      activation: gated layer in the following shape:
-      'batch_size' x 'number_of_activation'
-  """
-  input_dim = input_layer.get_shape().as_list()[1] 
-  
-  gating_weights = tf.get_variable("gating_weights",
-    [input_dim, input_dim],
-    initializer = tf.random_normal_initializer(
-    stddev=1 / math.sqrt(input_dim)))
-  
-  gates = tf.matmul(input_layer, gating_weights)
-
-  if add_batch_norm:
-    gates = slim.batch_norm(
-        gates,
-        center=True,
-        scale=True,
-        is_training=is_training,
-        scope="gating_bn")
-  else:
-    gating_biases = tf.get_variable("gating_biases", [input_dim],
-      initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(input_dim)))
-    gates += gating_biases
-
-  gates = tf.nn.sigmoid(gates)
-  activation = tf.multiply(input_layer, gates)
-  return activation
+  def CirculantLayer(self, X):
+    mat = []
+    batch_size = X.get_shape()[0]
+    for params in self.parameters:
+      ret = X
+      for weights, diag in params:
+        ret = tf.multiply(ret, diag)
+        fft1 = tf.spectral.rfft(ret)
+        fft2 = tf.spectral.rfft(weights[..., ::-1])
+        fft_mul = tf.multiply(fft1, fft2)
+        ifft_val = tf.spectral.irfft(fft_mul)
+        ret = tf.cast(tf.real(ifft_val), tf.float32)                
+        ret = tf.manip.roll(ret, 1, axis=1)              
+      mat.append(ret)
+    return tf.concat(mat, axis=1)[..., self.out_dim]
 
 class NetVLAD():
   """
@@ -170,7 +216,6 @@ class NetVLAD():
     vlad = tf.nn.l2_normalize(vlad,1)
 
     return vlad
-
 
 class DBof():
 
