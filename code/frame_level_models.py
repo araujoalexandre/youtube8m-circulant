@@ -20,7 +20,8 @@ import models
 import video_level_models
 import tensorflow as tf
 import model_utils as utils
-from utils_layer import CirculantLayer, NetVLAD, DBof
+from utils_layer import CirculantLayer, CirculantLayerWithFactor
+from utils_layer import NetVLAD, DBof
 from utils_layer import context_gating
 
 import tensorflow.contrib.slim as slim
@@ -901,7 +902,7 @@ class CirculantWithFactor_DoubleDbofModel(models.BaseModel):
     with tf.variable_scope('circulant_fc_layer'):
       initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(hidden1_size))
       input_dim = activation.get_shape().as_list()
-      circ_layer_hidden = CirculantLayer(input_dim, hidden1_size, 
+      circ_layer_hidden = CirculantLayerWithFactor(input_dim, hidden1_size, 
                   k_factor=k_factor, initializer=initializer)
       activation = circ_layer_hidden.matmul(activation)
 
