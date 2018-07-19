@@ -73,6 +73,10 @@ flags.DEFINE_bool("full_add_batch_norm", True,
 flags.DEFINE_bool("full_gating", True,
                   "Activate Context Gating layer after Full fc layer.")
 
+flags.DEFINE_bool('moe_add_batch_norm', True, 
+                  "Adds batch normalization to the MoE Layer.")
+
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
