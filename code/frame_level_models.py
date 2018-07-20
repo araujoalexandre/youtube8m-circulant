@@ -80,6 +80,16 @@ flags.DEFINE_bool('moe_add_batch_norm', True,
 flags.DEFINE_integer('k_factor', 1, 
                   "k_factor for circulant layer.")
 
+flags.DEFINE_bool("video_add_batch_norm", True,
+                  "Adds batch normalization to the video emmbedding in double Video/Audio model.")
+flags.DEFINE_bool("audio_add_batch_norm", True,
+                  "Adds batch normalization to the audio emmbedding in double Video/Audio model.")
+flags.DEFINE_integer("video_hidden_size", 1024,
+                     "Number of units in the fc layer in video emmbedding in double Video/Audio model.")
+flags.DEFINE_integer("audio_hidden_size", 1024,
+                     "Number of units in the fc layer in audio emmbedding in double Video/Audio model.")
+
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -693,6 +703,208 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
         is_training=is_training,
         add_batch_norm=moe_add_batch_norm,
         **unused_params)
+
+
+class DoubleVideoDoubleAudioModel(models.BaseModel):
+  """Creates a Deep Bag of Frames model.
+
+  The model projects the features for each frame into a higher dimensional
+  'clustering' space, pools across frames in that space, and then
+  uses a configurable video-level model to classify the now aggregated features.
+
+  The model will randomly sample either frames or sequences of frames during
+  training to speed up convergence.
+
+  Args:
+    model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
+                 input features.
+    vocab_size: The number of classes in the dataset.
+    num_frames: A vector of length 'batch' which indicates the number of
+         frames for each video (before padding).
+
+  Returns:
+    A dictionary with a tensor containing the probability predictions of the
+    model in the 'predictions' key. The dimensions of the tensor are
+    'batch_size' x 'num_classes'.
+  """
+
+  def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_frames,
+                   iterations=None,
+                   sample_random_frames=None,
+                   input_add_batch_norm=None,
+                   video_add_batch_norm=None,
+                   audio_add_batch_norm=None,
+                   video_hidden_size=None,
+                   audio_hidden_size=None,                   
+                   dbof_cluster_size=None,
+                   netvlad_cluster_size=None,
+                   full_hidden_size=None,
+                   full_add_batch_norm=None,
+                   full_gating=None,
+                   moe_add_batch_norm=None,
+                   is_training=True,
+                   **unused_params):
+
+    iterations = iterations or FLAGS.iterations
+    random_frames = sample_random_frames or FLAGS.sample_random_frames
+    input_add_batch_norm = input_add_batch_norm or FLAGS.input_add_batch_norm
+    
+    video_add_batch_norm = video_add_batch_norm or FLAGS.video_add_batch_norm
+    audio_add_batch_norm = audio_add_batch_norm or FLAGS.audio_add_batch_norm
+    video_hidden_size = video_hidden_size or FLAGS.video_hidden_size
+    audio_hidden_size = audio_hidden_size or FLAGS.audio_hidden_size
+
+    dbof_cluster_size = dbof_cluster_size or FLAGS.dbof_cluster_size
+    netvlad_cluster_size = netvlad_cluster_size or FLAGS.netvlad_cluster_size
+
+
+    full_add_batch_norm = full_add_batch_norm or FLAGS.full_add_batch_norm
+    full_hidden_size = full_hidden_size or FLAGS.full_hidden_size
+    full_gating = full_gating or FLAGS.full_gating
+
+    moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
+
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+    if random_frames:
+      model_input = utils.SampleRandomFrames(model_input, num_frames,
+                                             iterations)
+    else:
+      model_input = utils.SampleRandomSequence(model_input, num_frames,
+                                               iterations)
+    max_frames = model_input.get_shape().as_list()[1]
+    feature_size = model_input.get_shape().as_list()[2]
+    reshaped_input = tf.reshape(model_input, [-1, feature_size])
+    tf.summary.histogram("input_hist", reshaped_input)
+
+    if input_add_batch_norm:
+      reshaped_input = slim.batch_norm(
+          reshaped_input,
+          center=True,
+          scale=True,
+          is_training=is_training,
+          scope="input_bn")
+
+    with tf.variable_scope('video'):
+
+
+      with tf.variable_scope("DBoF"):
+        video_DBoF = DBof(1024, max_frames, dbof_cluster_size, 
+          FLAGS.dbof_pooling_method, video_add_batch_norm, is_training)
+        dbof_video = video_DBoF.forward(reshaped_input[:, 0:1024]) 
+
+      with tf.variable_scope("NetVLAD"):
+        video_NetVLAD = NetVLAD(1024, max_frames, netvlad_cluster_size, video_add_batch_norm, is_training)
+        vlad_video = video_NetVLAD.forward(reshaped_input[:, 0:1024]) 
+
+      video_activation = tf.concat([dbof_video, vlad_video], 1)
+
+      dim = video_activation.get_shape().as_list()[1]
+      video_hidden_weights = tf.get_variable("dbof_hidden_weights",
+        [dim, video_hidden_size],
+        initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(video_hidden_size)))
+      tf.summary.histogram("video_hidden_weights", video_hidden_weights)
+      
+      video_activation = tf.matmul(video_activation, video_hidden_weights)
+      
+      if video_add_batch_norm:
+        video_activation = slim.batch_norm(
+            video_activation,
+            center=True,
+            scale=True,
+            is_training=is_training,
+            scope="hidden1_bn")
+      else:
+        video_hidden_biases = tf.get_variable("dbof_hidden_biases",
+          [video_hidden_size],
+          initializer = tf.random_normal_initializer(stddev=0.01))
+        tf.summary.histogram("dbof_hidden_biases", video_hidden_biases)
+        video_activation += video_hidden_biases
+      
+      video_activation = tf.nn.relu6(video_activation)
+      tf.summary.histogram("dbof_hidden_output", video_activation)
+
+    with tf.variable_scope('audio'):
+      
+      with tf.variable_scope("DBoF"):
+        audio_DBoF = DBof(128, max_frames, dbof_cluster_size // 2, 
+          FLAGS.dbof_pooling_method, audio_add_batch_norm, is_training)
+        dbof_audio = audio_DBoF.forward(reshaped_input[:, 1024:])
+
+      with tf.variable_scope("NetVLAD"):
+        audio_NetVLAD = NetVLAD(128, max_frames, netvlad_cluster_size // 2, audio_add_batch_norm, is_training)
+        vlad_audio = audio_NetVLAD.forward(reshaped_input[:, 1024:])
+
+      audio_activation = tf.concat([dbof_audio, vlad_audio], 1)
+
+      audio_dim = audio_activation.get_shape().as_list()[1] 
+      audio_hidden_weights = tf.get_variable("audio_hidden_weights",
+        [audio_dim, audio_hidden_size],
+        initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(audio_hidden_size)))
+         
+      audio_activation = tf.matmul(audio_activation, audio_hidden_weights)
+
+      if audio_add_batch_norm:
+        audio_activation = slim.batch_norm(
+            audio_activation,
+            center=True,
+            scale=True,
+            is_training=is_training,
+            scope="audio_hidden_bn")
+      else:
+        audio_hidden_biases = tf.get_variable("audio_hidden_biases",
+          [video_hidden_size],
+          initializer = tf.random_normal_initializer(stddev=0.01))
+        tf.summary.histogram("audio_hidden_biases", video_hidden_biases)
+        audio_activation += audio_hidden_biases
+     
+      audio_activation = tf.nn.relu6(audio_activation)
+      tf.summary.histogram("audio_hidden_output", audio_activation)
+
+
+    full_activation = tf.concat([video_activation, audio_activation], 1)
+
+    with tf.variable_scope('merge_video_audio'):
+
+      full_activation_dim = full_activation.get_shape().as_list()[1] 
+      full_hidden_weights = tf.get_variable("full_hidden_weights",
+        [full_activation_dim, full_hidden_size],
+        initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(full_hidden_size)))
+         
+      full_activation = tf.matmul(full_activation, full_hidden_weights)
+
+      if full_add_batch_norm:
+        full_activation = slim.batch_norm(
+            full_activation,
+            center=True,
+            scale=True,
+            is_training=is_training,
+            scope="netvlad_hidden_bn")
+      else:
+        full_hidden_biases = tf.get_variable("full_hidden_biases",
+          [full_hidden_size],
+          initializer = tf.random_normal_initializer(stddev=0.01))
+        tf.summary.histogram("full_hidden_biases", full_hidden_biases)
+        full_activation += full_hidden_biases
+     
+      full_activation = tf.nn.relu6(full_activation)
+      tf.summary.histogram("vlad_hidden_output", full_activation)
+
+    if full_gating:
+      with tf.variable_scope('gating_frame_level'):
+        full_activation = context_gating(full_activation, full_add_batch_norm, is_training)
+
+    aggregated_model = getattr(video_level_models,
+                               FLAGS.video_level_classifier_model)
+    return aggregated_model().create_model(
+        model_input=full_activation,
+        vocab_size=vocab_size,
+        is_training=is_training,
+        add_batch_norm=moe_add_batch_norm,
+        **unused_params)
+
 
 
 
