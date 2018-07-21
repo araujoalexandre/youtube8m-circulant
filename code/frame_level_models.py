@@ -470,7 +470,7 @@ class NetFVModel(models.BaseModel):
       fv_video = video_NetFV.forward(reshaped_input[:,0:1024]) 
 
     with tf.variable_scope("audio_FV"):
-      audio_NetFV = NetFV(128, max_frames, cluster_size/2, add_batch_norm, 
+      audio_NetFV = NetFV(128, max_frames, cluster_size // 2, add_batch_norm, 
         couple_weights, coupling_factor, is_training)
       fv_audio = audio_NetFV.forward(reshaped_input[:,1024:])
 
