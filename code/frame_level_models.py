@@ -1029,6 +1029,26 @@ class DoubleVideoDoubleAudioModel(models.BaseModel):
         **unused_params)
 
 
+class Ensemble_DoubleDbofModel_NetVLADModel(models.BaseModel):
+
+  def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_frames,
+                   **unused_params):
+    
+    dbof = DoubleDbofModel().create_model(model_input, vocab_size, num_frames)
+    netvlad = NetVLADModel().create_model(model_input, vocab_size, num_frames)
+
+    dbof_predictions = dbof['predictions']
+    netvlad_predictions = netvlad['predictions']
+
+    coef1 = tf.Variable(tf.constant(0.5))
+    coef2 = tf.Variable(tf.constant(0.5))
+
+    final = coef1*dbof_predictions + coef2*netvlad_predictions
+
+    return {'predictions': final}
 
 
 class Circulant_DbofModel(models.BaseModel):
