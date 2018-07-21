@@ -21,7 +21,7 @@ import video_level_models
 import tensorflow as tf
 import model_utils as utils
 from utils_layer import CirculantLayer, CirculantLayerWithFactor
-from utils_layer import NetVLAD, DBof
+from utils_layer import NetVLAD, DBof, NetFV
 from utils_layer import context_gating
 
 import tensorflow.contrib.slim as slim
@@ -88,6 +88,20 @@ flags.DEFINE_integer("video_hidden_size", 1024,
                      "Number of units in the fc layer in video emmbedding in double Video/Audio model.")
 flags.DEFINE_integer("audio_hidden_size", 1024,
                      "Number of units in the fc layer in audio emmbedding in double Video/Audio model.")
+
+
+flags.DEFINE_bool('fv_add_batch_norm', True, 
+                  "Adds batch normalization to the FisherVector Model.")
+flags.DEFINE_integer("fv_cluster_size", 64,
+                     "Number of units to the FisherVector Model.")
+flags.DEFINE_integer("fv_hidden_size", 1024,
+                     "Number of units in the FisherVector hidden layer.")
+flags.DEFINE_bool("fv_couple_weights", True,
+                     "Coupling cluster weights or not") 
+flags.DEFINE_float("fv_coupling_factor", 0.01,
+                     "Coupling factor")
+flags.DEFINE_bool("fv_gating", True,
+                  "Activate Context Gating layer after Fisher Vector Layer")
 
 
 
@@ -389,6 +403,117 @@ class NetVLADModel(models.BaseModel):
         add_batch_norm=add_batch_norm,
         **unused_params)
 
+class NetFVModel(models.BaseModel):
+  """Creates a NetFV based model.
+     It emulates a Gaussian Mixture Fisher Vector pooling operations
+  Args:
+    model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
+                 input features.
+    vocab_size: The number of classes in the dataset.
+    num_frames: A vector of length 'batch' which indicates the number of
+         frames for each video (before padding).
+  Returns:
+    A dictionary with a tensor containing the probability predictions of the
+    model in the 'predictions' key. The dimensions of the tensor are
+    'batch_size' x 'num_classes'.
+  """
+  def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_frames,
+                   iterations=None,
+                   sample_random_frames=None,
+                   add_batch_norm=None,
+                   cluster_size=None,
+                   hidden_size=None,
+                   couple_weights=None,
+                   coupling_factor=None,
+                   moe_add_batch_norm=None,
+                   is_training=True,
+                   **unused_params):
+
+    iterations = iterations or FLAGS.iterations
+    random_frames = sample_random_frames or FLAGS.sample_random_frames
+    
+    add_batch_norm = add_batch_norm or FLAGS.fv_add_batch_norm
+    cluster_size = cluster_size or FLAGS.fv_cluster_size
+    hidden1_size = hidden_size or FLAGS.fv_hidden_size
+    couple_weights = couple_weights or FLAGS.fv_couple_weights
+    coupling_factor = coupling_factor or FLAGS.fv_coupling_factor
+    gating = FLAGS.fv_gating
+
+    moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
+
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+    if random_frames:
+      model_input = utils.SampleRandomFrames(model_input, num_frames,
+                                             iterations)
+    else:
+      model_input = utils.SampleRandomSequence(model_input, num_frames,
+                                               iterations)
+    max_frames = model_input.get_shape().as_list()[1]
+    feature_size = model_input.get_shape().as_list()[2]
+    reshaped_input = tf.reshape(model_input, [-1, feature_size])
+    tf.summary.histogram("input_hist", reshaped_input)
+
+    if add_batch_norm:
+      reshaped_input = slim.batch_norm(
+          reshaped_input,
+          center=True,
+          scale=True,
+          is_training=is_training,
+          scope="input_bn")
+
+    with tf.variable_scope("video_FV"):
+      video_NetFV = NetFV(1024, max_frames, cluster_size, add_batch_norm, 
+          couple_weights, coupling_factor, is_training)
+      fv_video = video_NetFV.forward(reshaped_input[:,0:1024]) 
+
+    with tf.variable_scope("audio_FV"):
+      audio_NetFV = NetFV(128, max_frames, cluster_size/2, add_batch_norm, 
+        couple_weights, coupling_factor, is_training)
+      fv_audio = audio_NetFV.forward(reshaped_input[:,1024:])
+
+    fv = tf.concat([fv_video, fv_audio], 1)
+
+    fv_dim = fv.get_shape().as_list()[1] 
+    hidden1_weights = tf.get_variable("hidden1_weights",
+      [fv_dim, hidden1_size],
+      initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(cluster_size)))
+    
+    activation = tf.matmul(fv, hidden1_weights)
+
+    if add_batch_norm:
+      activation = slim.batch_norm(
+          activation,
+          center=True,
+          scale=True,
+          is_training=is_training,
+          scope="hidden1_bn")
+    else:
+      hidden1_biases = tf.get_variable("hidden1_biases",
+        [hidden1_size],
+        initializer = tf.random_normal_initializer(stddev=0.01))
+      tf.summary.histogram("hidden1_biases", hidden1_biases)
+      activation += hidden1_biases
+   
+    activation = tf.nn.relu6(activation)
+
+    if gating:
+      with tf.variable_scope('gating_frame_level'):
+        activation = context_gating(activation, add_batch_norm, is_training)
+
+    aggregated_model = getattr(video_level_models,
+                               FLAGS.video_level_classifier_model)
+
+    return aggregated_model().create_model(
+        model_input=activation,
+        vocab_size=vocab_size,
+        is_training=is_training,
+        add_batch_norm=moe_add_batch_norm,
+        **unused_params)
+
+
 class DoubleDbofModel(models.BaseModel):
   """Creates a Deep Bag of Frames model.
 
@@ -499,7 +624,6 @@ class DoubleDbofModel(models.BaseModel):
         is_training=is_training,
         add_batch_norm=add_batch_norm,
         **unused_params)
-
 
 class DoubleDbofDoubleNetVLADModel(models.BaseModel):
   """Creates a Deep Bag of Frames model.
@@ -703,7 +827,6 @@ class DoubleDbofDoubleNetVLADModel(models.BaseModel):
         is_training=is_training,
         add_batch_norm=moe_add_batch_norm,
         **unused_params)
-
 
 class DoubleVideoDoubleAudioModel(models.BaseModel):
   """Creates a Deep Bag of Frames model.
