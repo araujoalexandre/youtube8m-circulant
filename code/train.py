@@ -461,7 +461,7 @@ class Trainer(object):
         init_op=init_op,
         is_chief=self.is_master,
         global_step=global_step,
-        save_model_secs=15 * 60,
+        save_model_secs=20 * 60,
         save_summaries_secs=120,
         saver=saver)
 
