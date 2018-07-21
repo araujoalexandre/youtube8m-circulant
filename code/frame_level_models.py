@@ -1037,6 +1037,7 @@ class Ensemble_DoubleDbofModel_NetVLADModel(models.BaseModel):
                    num_frames,
                    **unused_params):
     
+
     with tf.variable_scope('dbof'):
       dbof = DoubleDbofModel().create_model(model_input, vocab_size, num_frames)
       dbof_predictions = dbof['predictions']
@@ -1045,8 +1046,11 @@ class Ensemble_DoubleDbofModel_NetVLADModel(models.BaseModel):
       netvlad = NetVLADModel().create_model(model_input, vocab_size, num_frames)
       netvlad_predictions = netvlad['predictions']
 
-    coef1 = tf.Variable(tf.constant(0.5))
-    coef2 = tf.Variable(tf.constant(0.5))
+    coef1 = tf.Variable(0.5)
+    coef2 = tf.Variable(0.5)
+
+    tf.summary.scalar("DBoF coef", coef1)
+    tf.summary.scalar("Netvlad coef", coef2)
 
     final = coef1*dbof_predictions + coef2*netvlad_predictions
 
