@@ -428,8 +428,8 @@ class Trainer(object):
     meta_filename = self.get_meta_filename(start_new_model, self.train_dir)
 
     with tf.Graph().as_default() as graph:
-      if meta_filename:
-        saver = self.recover_model(meta_filename)
+      # if meta_filename:
+      #   saver = self.recover_model(meta_filename)
 
       with tf.device(device_fn):
         if not meta_filename:
@@ -440,25 +440,26 @@ class Trainer(object):
         predictions = tf.get_collection("predictions")[0]
         labels = tf.get_collection("labels")[0]
         train_op = tf.get_collection("train_op")[0]
-        init_op = tf.global_variables_initializer()
+        
+        if meta_filename:
+          saver = tf.train.Saver(tf.global_variables())
+          
+          def init_fn(sess):
+            logging.info('====> meta_filename : {}'.format(meta_filename))
+            return saver.restore(sess, meta_filename)
 
-    # log the size of trainable variables.
-    total = 0
-    for var in tf.trainable_variables():
-      var_size = 1
-      for x in var.get_shape():
-        var_size *= x.value
-      msg = 'var {}, shape {}, size {}'.format(
-        var.name, var.shape, var_size)
-      tf.logging.info('{}'.format(msg))
-      total += var_size
-    tf.logging.info('Total parameters : {}'.format(total))
+          init_op = None
 
+        else:
+
+          init_op = tf.global_variables_initializer()
+          init_fn = None
 
     sv = tf.train.Supervisor(
         graph,
         logdir=self.train_dir,
         init_op=init_op,
+        init_fn=init_fn,
         is_chief=self.is_master,
         global_step=global_step,
         save_model_secs=40 * 60,
