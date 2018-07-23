@@ -428,12 +428,8 @@ class Trainer(object):
     meta_filename = self.get_meta_filename(start_new_model, self.train_dir)
 
     with tf.Graph().as_default() as graph:
-      # if meta_filename:
-      #   saver = self.recover_model(meta_filename)
 
       with tf.device(device_fn):
-        # if not meta_filename:
-        #   saver = self.build_model(self.model, self.reader)
 
         saver = self.build_model(self.model, self.reader)
 
@@ -443,17 +439,13 @@ class Trainer(object):
         labels = tf.get_collection("labels")[0]
         train_op = tf.get_collection("train_op")[0]
         
+        init_op, init_fn = None, None
         if meta_filename:
           saver = tf.train.Saver(tf.global_variables())
           def init_fn(sess):
-            logging.info('====> meta_filename : {}'.format(meta_filename))
             return saver.restore(sess, meta_filename)
-          init_op = None
-
         else:
-
           init_op = tf.global_variables_initializer()
-          init_fn = None
 
     sv = tf.train.Supervisor(
         graph,
