@@ -432,8 +432,10 @@ class Trainer(object):
       #   saver = self.recover_model(meta_filename)
 
       with tf.device(device_fn):
-        if not meta_filename:
-          saver = self.build_model(self.model, self.reader)
+        # if not meta_filename:
+        #   saver = self.build_model(self.model, self.reader)
+
+        saver = self.build_model(self.model, self.reader)
 
         global_step = tf.get_collection("global_step")[0]
         loss = tf.get_collection("loss")[0]
@@ -443,11 +445,9 @@ class Trainer(object):
         
         if meta_filename:
           saver = tf.train.Saver(tf.global_variables())
-          
           def init_fn(sess):
             logging.info('====> meta_filename : {}'.format(meta_filename))
             return saver.restore(sess, meta_filename)
-
           init_op = None
 
         else:
