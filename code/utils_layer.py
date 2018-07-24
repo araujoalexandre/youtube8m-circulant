@@ -356,3 +356,60 @@ class DBof():
     activation = utils.FramePooling(activation, self.dbof_pooling_method)
 
     return activation
+
+class DBofCirculant():
+
+  def __init__(self, 
+               feature_size, 
+               max_frames, 
+               cluster_size, 
+               dbof_pooling_method,
+               add_batch_norm, 
+               k_factor,
+               is_training):
+    self.feature_size = feature_size
+    self.max_frames = max_frames
+    self.cluster_size = cluster_size
+    self.dbof_pooling_method = dbof_pooling_method
+    self.add_batch_norm = add_batch_norm
+    self.k_factor = k_factor
+    self.is_training = is_training
+
+  def forward(self, reshaped_input):
+
+    initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(self.cluster_size))
+    input_dim = reshaped_input.get_shape().as_list()
+    circ_layer_hidden = CirculantLayerWithFactor(
+                          (None, self.feature_size), 
+                          self.cluster_size, 
+                          k_factor=self.k_factor, 
+                          initializer=initializer)
+    activation = circ_layer_hidden.matmul(reshaped_input)
+
+    # cluster_weights = tf.get_variable("cluster_weights",
+    #   [self.feature_size, self.cluster_size],
+    #   initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(self.cluster_size)))
+    # tf.summary.histogram("cluster_weights", cluster_weights)
+    # activation = tf.matmul(reshaped_input, cluster_weights)
+    
+    if self.add_batch_norm:
+      activation = slim.batch_norm(
+          activation,
+          center=True,
+          scale=True,
+          is_training=self.is_training,
+          scope="cluster_bn")
+    else:
+      cluster_biases = tf.get_variable("cluster_biases",
+        [self.cluster_size],
+        initializer = tf.random_normal(stddev=1 / math.sqrt(self.feature_size)))
+      tf.summary.histogram("cluster_biases", cluster_biases)
+      activation += cluster_biases
+    
+    activation = tf.nn.relu6(activation)
+    tf.summary.histogram("cluster_output", activation)
+
+    activation = tf.reshape(activation, [-1, self.max_frames, self.cluster_size])
+    activation = utils.FramePooling(activation, self.dbof_pooling_method)
+
+    return activation
