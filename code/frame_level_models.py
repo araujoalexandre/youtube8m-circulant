@@ -1163,7 +1163,7 @@ class EnsembleEarlyConcat(models.BaseModel):
       dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, name):
       with tf.variable_scope(name):
 
-        with tf.variable_scope("DBoF"):
+        with tf.variable_scope("DBoF_{}".format(name)):
           dbof_cls = DBof(size, max_frames, dbof_cluster_size, 
             FLAGS.dbof_pooling_method, embedding_add_batch_norm, is_training)
           list_dbof = []
@@ -1172,7 +1172,7 @@ class EnsembleEarlyConcat(models.BaseModel):
             list_dbof.append(dbof)
           dbof = tf.concat(list_dbof, 1)
 
-        with tf.variable_scope("NetVLAD"):
+        with tf.variable_scope("NetVLAD{}".format(name)):
           netvlad_cls = NetVLAD(size, max_frames, netvlad_cluster_size, 
            embedding_add_batch_norm, is_training)
           list_vlad = []
@@ -1181,7 +1181,7 @@ class EnsembleEarlyConcat(models.BaseModel):
             list_vlad.append(netvlad)
           netvlad = tf.concat(list_vlad, 1)
 
-        with tf.variable_scope("Fisher_vector"):
+        with tf.variable_scope("Fisher_vector{}".format(name)):
           netfv_cls = NetFV(size, max_frames, fv_cluster_size, 
             embedding_add_batch_norm, fv_couple_weights, fv_coupling_factor, 
             is_training)
