@@ -29,6 +29,6 @@ EXPORT="export LD_LIBRARY_PATH=/pwrlocal/pub/openmpi/2.1.2/arch/gcc-4.8/lib:/pwr
 $EXPORT; python3 ${EXEC_DIR}/eval.py \
 ${PYTHON_ARGS} \
 --train_dir ${TRAIN_DIR} \
---eval_data_pattern=${WORKDIR}/yt8m/${DATA_TYPE}/valid*.tfrecord \
+--eval_data_pattern=${WORKDIR}/yt8m/${DATA_TYPE}/validate[0-9]*.tfrecord \
 --num_readers 100 \
 --run_once &>> $TRAIN_DIR_LOG &
