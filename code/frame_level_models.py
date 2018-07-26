@@ -1150,14 +1150,14 @@ class EnsembleEarlyConcat(models.BaseModel):
             scale=True,
             is_training=is_training,
             scope="input_bn_{}".format(id_))
-      return get_input, max_frames
+      return reshaped_input, max_frames
 
-    model_inputs_video = []
-    model_inputs_audio = []
+    sample_model_inputs_video = []
+    sample_model_inputs_audio = []
     for i in range(n_bagging):
-      model_input, max_frames = get_input(i)
-      model_inputs_video.append(model_input[:, 0:1024])
-      model_inputs_audio.append(model_input[:, 1024:])
+      sample_model_input, max_frames = get_input(i)
+      sample_model_inputs_video.append(sample_model_input[:, 0:1024])
+      sample_model_inputs_audio.append(sample_model_input[:, 1024:])
 
     def make_embedding(model_inputs, size, 
       dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, name):
@@ -1192,9 +1192,9 @@ class EnsembleEarlyConcat(models.BaseModel):
 
       return dbof, netvlad, fv
 
-    dbof_video, netvlad_video = make_embedding(model_inputs_video, 1024, 
+    dbof_video, netvlad_video = make_embedding(sample_model_inputs_video, 1024, 
       dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, 'video')
-    dbof_audio, netvlad_audio = make_embedding(model_inputs_audio, 128, 
+    dbof_audio, netvlad_audio = make_embedding(sample_model_inputs_audio, 128, 
       dbof_cluster_size // 2, netvlad_cluster_size // 2, fv_cluster_size // 2, 'audio')
 
     activation = tf.concat([dbof_video, netvlad_video, dbof_audio, netvlad_audio], 1)
