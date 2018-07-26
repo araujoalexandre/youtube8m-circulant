@@ -441,7 +441,8 @@ class Trainer(object):
         
         init_op, init_fn = None, None
         if meta_filename:
-          saver = tf.train.Saver(tf.global_variables())
+          saver = tf.train.Saver(tf.global_variables(), 
+            max_to_keep=0, keep_checkpoint_every_n_hours=0.25)
           def init_fn(sess):
             return saver.restore(sess, meta_filename)
         else:
