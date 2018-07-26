@@ -29,6 +29,8 @@ flags.DEFINE_integer("moe_num_mixtures", 2,
     "The number of mixtures (excluding the dummy 'expert') used for MoeModel.")
 flags.DEFINE_bool("MoE_gating", True, 
                   """Activate Context Gating after MoE.""")
+flags.DEFINE_float("moe_l2", 1e-8,
+                   "L2 penalty for MoeModel.")
 
 class LogisticModel(models.BaseModel):
   """Logistic model with L2 regularization."""
@@ -81,6 +83,7 @@ class MoeModel(models.BaseModel):
     """
     num_mixtures = num_mixtures or FLAGS.moe_num_mixtures
     gating = gating or FLAGS.MoE_gating
+    l2_penalty = FLAGS.moe_l2
 
     gate_activations = slim.fully_connected(
         model_input,
