@@ -1202,12 +1202,13 @@ class EnsembleEarlyConcat(models.BaseModel):
 
       return dbof, netvlad, fv
 
-    dbof_video, netvlad_video = make_embedding(sample_model_inputs_video, 1024, 
+    dbof_video, netvlad_video, fv_video = make_embedding(sample_model_inputs_video, 1024, 
       dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, 'video')
-    dbof_audio, netvlad_audio = make_embedding(sample_model_inputs_audio, 128, 
+    dbof_audio, netvlad_audio, fv_audio = make_embedding(sample_model_inputs_audio, 128, 
       dbof_cluster_size // 2, netvlad_cluster_size // 2, fv_cluster_size // 2, 'audio')
 
-    activation = tf.concat([dbof_video, netvlad_video, dbof_audio, netvlad_audio], 1)
+    activation = tf.concat([dbof_video, netvlad_video, fv_video, 
+                            dbof_audio, netvlad_audio, fv_audio], 1)
 
     with tf.variable_scope('merge_video_audio'):
 
