@@ -1163,32 +1163,42 @@ class EnsembleEarlyConcat(models.BaseModel):
       dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, name):
       with tf.variable_scope(name):
 
-        with tf.variable_scope("DBoF_{}".format(name)):
+        with tf.variable_scope("DBoF_{}".format(name), reuse=tf.AUTO_REUSE):
           dbof_cls = DBof(size, max_frames, dbof_cluster_size, 
             FLAGS.dbof_pooling_method, embedding_add_batch_norm, is_training)
           list_dbof = []
-          for model_input in model_inputs:
-            dbof = dbof_cls.forward(model_input)
-            list_dbof.append(dbof)
-          dbof = tf.concat(list_dbof, 1)
+          if len(model_inputs) > 1:
+            for model_input in model_inputs:
+              dbof = dbof_cls.forward(model_input)
+              list_dbof.append(dbof)
+            dbof = tf.concat(list_dbof, 1)
+          else:
+            dbof = dbof_cls.forward(model_inputs[0])
 
-        with tf.variable_scope("NetVLAD{}".format(name)):
+        with tf.variable_scope("NetVLAD{}".format(name), reuse=tf.AUTO_REUSE):
           netvlad_cls = NetVLAD(size, max_frames, netvlad_cluster_size, 
            embedding_add_batch_norm, is_training)
           list_vlad = []
-          for model_input in model_inputs:
-            netvlad = netvlad_cls.forward(model_input)
-            list_vlad.append(netvlad)
-          netvlad = tf.concat(list_vlad, 1)
+          if len(model_inputs) > 1:
+            for model_input in model_inputs:
+              netvlad = netvlad_cls.forward(model_input)
+              list_vlad.append(netvlad)
+            netvlad = tf.concat(list_vlad, 1)
+          else:
+            netvlad = netvlad_cls.forward(model_inputs[0])
 
-        with tf.variable_scope("Fisher_vector{}".format(name)):
+        with tf.variable_scope("Fisher_vector{}".format(name), reuse=tf.AUTO_REUSE):
           netfv_cls = NetFV(size, max_frames, fv_cluster_size, 
             embedding_add_batch_norm, fv_couple_weights, fv_coupling_factor, 
             is_training)
           list_fv = []
-          for model_input in model_inputs:
-            fv = netfv_cls.forward(model_input)
-          fv = tf.concat(list_fv, 1)
+          if len(model_inputs) > 1:
+            for model_input in model_inputs:
+              fv = netfv_cls.forward(model_input)
+              list_fv.append(fv)
+            fv = tf.concat(list_fv, 1)
+          else:
+            fv = netfv_cls.forward(model_inputs[0])
 
       return dbof, netvlad, fv
 
