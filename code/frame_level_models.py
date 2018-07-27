@@ -1645,7 +1645,7 @@ class EmbeddingPipeline(models.BaseModel):
         add_batch_norm=moe_add_batch_norm,
         **unused_params)
 
-class EnsembleLateConcatAverage(models.BaseModel):
+class EnsembleLateAverage(models.BaseModel):
 
   def create_model(self,
                    model_input,
