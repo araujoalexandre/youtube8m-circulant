@@ -1654,8 +1654,8 @@ class EnsembleLateAverage(models.BaseModel):
                    **unused_params):
     
     n_embedding = 0
+    total_preds = []
     for embedding in ['dbof', 'netvlad', 'fisher']:
-      total_preds = []
       with tf.variable_scope(embedding):
         predictions = EmbeddingPipeline().create_model(
           model_input, vocab_size, num_frames, embedding)
