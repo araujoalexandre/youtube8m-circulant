@@ -280,7 +280,7 @@ def build_graph(reader,
     num_frames = num_frames // 2
 
     # create mask for non even nomber of frame
-    mod_num_frames = tf.squeeze(tf.stack((mod_num_frames, tf.fill(mod_num_frames.get_shape(), 0))))
+    mod_num_frames = tf.squeeze(tf.stack((mod_num_frames, tf.fill((1, lenght), 0))))
     mod_num_frames = tf.transpose(mod_num_frames)
     mod_num_frames = tf.reshape(mod_num_frames, (1, lenght * 2))
 
