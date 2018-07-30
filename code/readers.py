@@ -59,7 +59,7 @@ def _resize_axis(tensor, axis, new_size, fill_value=0):
   return resized
 
 def _resize_axis_for_data_augmentation(tensor, axis, new_size, fill_value=0):
-  tensor = tf.convert_to_tensor([[1, 2, 3], [4, 5, 6], [4, 5, 6]])
+  tensor = tf.convert_to_tensor(tensor)
   shape = tf.unstack(tf.shape(tensor))
 
   if shape[0] % 2 == 0:
