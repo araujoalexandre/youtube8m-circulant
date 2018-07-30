@@ -266,6 +266,25 @@ def build_graph(reader,
     _, dim_vocab_size = labels_batch.get_shape()
     labels_batch = tf.reshape(tf.tile(labels_batch, [1, 2]), (-1, dim_vocab_size))
 
+    mod_num_frames = tf.mod(num_frames, 2)
+
+    # repeat x2 num_frames
+    lenght = num_frames.get_shape()[1]
+    num_frames = tf.tile(num_frames, [2, 1])
+    num_frames = tf.transpose(num_frames)
+    num_frames = tf.reshape(num_frames, (1, lenght * 2))
+    num_frames = num_frames // 2
+
+    # create mask for non even nomber of frame
+    lenght = mod_num_frames.get_shape()[1]
+    mod_num_frames = tf.squeeze(tf.stack((mod_num_frames, tf.fill(mod_num_frames.get_shape(), 0))))
+    mod_num_frames = tf.transpose(mod_num_frames)
+    mod_num_frames = tf.reshape(mod_num_frames, (1, lenght * 2))
+
+    # finalize
+    num_frames = num_frames + mod_num_frames
+    
+
   tower_inputs = tf.split(model_input, num_towers)
   tower_labels = tf.split(labels_batch, num_towers)
   tower_num_frames = tf.split(num_frames, num_towers)
