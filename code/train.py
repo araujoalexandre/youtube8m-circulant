@@ -272,6 +272,7 @@ def build_graph(reader,
     mod_num_frames = tf.mod(num_frames, 2)
 
     # repeat x2 num_frames
+    num_frames = tf.expand_dims(num_frames, 0)
     lenght = num_frames.get_shape()[1]
     num_frames = tf.tile(num_frames, [2, 1])
     num_frames = tf.transpose(num_frames)
@@ -286,6 +287,7 @@ def build_graph(reader,
 
     # finalize
     num_frames = num_frames + mod_num_frames
+    num_frames = tf.squeeze(num_frames)
 
 
   tower_inputs = tf.split(model_input, num_towers)
