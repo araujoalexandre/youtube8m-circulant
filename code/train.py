@@ -264,10 +264,12 @@ def build_graph(reader,
   model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
 
   if FLAGS.data_augmentation:
-    _, dim_num_feature, dim_feature_size = model_input.get_shape()
-    model_input = tf.reshape(model_input, (-1, dim_num_feature // 2, dim_feature_size))
-    _, dim_vocab_size = labels_batch.get_shape()
-    labels_batch = tf.reshape(tf.tile(labels_batch, [1, 2]), (-1, dim_vocab_size))
+    max_features = model_input.get_shape().as_list()[1]
+    feature_size = model_input.get_shape().as_list()[2]
+    assert max_features % 2 == 0
+    model_input = tf.reshape(model_input, (-1, max_features // 2, feature_size))
+    vocab_size = reader.num_classes
+    labels_batch = tf.reshape(tf.tile(labels_batch, [1, 2]), (-1, vocab_size))
 
     num_frames = tf.expand_dims(num_frames, 0)
     mod_num_frames = tf.mod(num_frames, 2)
