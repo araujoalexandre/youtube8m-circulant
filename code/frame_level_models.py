@@ -346,7 +346,6 @@ class LstmModel(models.BaseModel):
     number_of_layers = FLAGS.lstm_layers
     random_frames = FLAGS.lstm_random_sequence
     iterations = FLAGS.iterations
-    backward = FLAGS.lstm_backward
     moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
 
     if random_frames:
@@ -401,7 +400,6 @@ class GruModel(models.BaseModel):
     """
     gru_size = FLAGS.gru_cells
     number_of_layers = FLAGS.gru_layers
-    backward = FLAGS.gru_backward
     random_frames = FLAGS.gru_random_sequence
     iterations = FLAGS.iterations
 
