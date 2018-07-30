@@ -1863,7 +1863,7 @@ class EnsembleEarlyConcatAverageWithFC(models.BaseModel):
       else:
         initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(fc_hidden_size))
         input_dim = input_.get_shape().as_list()
-        dbof_circ_layer_hidden = CirculantLayerWithFactor(input_dim, fc_hidden_size, 
+        circ_layer_hidden = CirculantLayerWithFactor(input_dim, fc_hidden_size, 
                     k_factor=k_factor, initializer=initializer)
         return circ_layer_hidden.matmul(input_)
 
