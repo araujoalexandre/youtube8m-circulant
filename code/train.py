@@ -268,7 +268,7 @@ def build_graph(reader,
     feature_size = model_input.get_shape().as_list()[2]
     assert max_features % 2 == 0
     model_input = tf.reshape(model_input, (-1, max_features // 2, feature_size))
-    vocab_size = reader.num_classes
+    vocab_size = labels_batch.get_shape().as_list()[1]
     labels_batch = tf.reshape(tf.tile(labels_batch, [1, 2]), (-1, vocab_size))
 
     num_frames = tf.expand_dims(num_frames, 0)
