@@ -327,7 +327,7 @@ class LstmModel(models.BaseModel):
                    model_input, 
                    vocab_size, 
                    num_frames,
-                   moe_add_batch_norm,
+                   moe_add_batch_norm=None,
                    is_training=True, 
                    **unused_params):
     """Creates a model which uses a stack of LSTMs to represent the video.
@@ -384,7 +384,7 @@ class GruModel(models.BaseModel):
                    model_input, 
                    vocab_size, 
                    num_frames,
-                   moe_add_batch_norm,
+                   moe_add_batch_norm=None,
                    is_training=True, 
                    **unused_params):
     """Creates a model which uses a stack of GRUs to represent the video.
