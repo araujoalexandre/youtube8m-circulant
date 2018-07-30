@@ -117,6 +117,13 @@ flags.DEFINE_bool("fc_gating", True,
                   "Activate Context Gating layer after FC from Ensemble Early Concat")
 
 
+flags.DEFINE_integer("gru_cells", 1024, "Number of GRU cells.")
+flags.DEFINE_integer("gru_layers", 2, "Number of GRU layers.")
+flags.DEFINE_bool("lstm_random_sequence", False,
+                     "Random sequence input for lstm.")
+flags.DEFINE_bool("gru_random_sequence", False,
+                     "Random sequence input for gru.")
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -273,18 +280,63 @@ class DbofModel(models.BaseModel):
         add_batch_norm=add_batch_norm,
         **unused_params)
 
+# class LstmModel(models.BaseModel):
+
+#   def create_model(self, model_input, vocab_size, num_frames, **unused_params):
+#     """Creates a model which uses a stack of LSTMs to represent the video.
+
+#     Args:
+#       model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
+#                    input features.
+#       vocab_size: The number of classes in the dataset.
+#       num_frames: A vector of length 'batch' which indicates the number of
+#            frames for each video (before padding).
+
+#     Returns:
+#       A dictionary with a tensor containing the probability predictions of the
+#       model in the 'predictions' key. The dimensions of the tensor are
+#       'batch_size' x 'num_classes'.
+#     """
+#     lstm_size = FLAGS.lstm_cells
+#     number_of_layers = FLAGS.lstm_layers
+
+#     stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+#             [
+#                 tf.contrib.rnn.BasicLSTMCell(
+#                     lstm_size, forget_bias=1.0)
+#                 for _ in range(number_of_layers)
+#                 ])
+
+#     loss = 0.0
+
+#     outputs, state = tf.nn.dynamic_rnn(stacked_lstm, model_input,
+#                                        sequence_length=num_frames,
+#                                        dtype=tf.float32)
+
+#     aggregated_model = getattr(video_level_models,
+#                                FLAGS.video_level_classifier_model)
+
+#     return aggregated_model().create_model(
+#         model_input=state[-1].h,
+#         vocab_size=vocab_size,
+#         **unused_params)
+
 class LstmModel(models.BaseModel):
 
-  def create_model(self, model_input, vocab_size, num_frames, **unused_params):
+  def create_model(self, 
+                   model_input, 
+                   vocab_size, 
+                   num_frames,
+                   moe_add_batch_norm,
+                   is_training=True, 
+                   **unused_params):
     """Creates a model which uses a stack of LSTMs to represent the video.
-
     Args:
       model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
                    input features.
       vocab_size: The number of classes in the dataset.
       num_frames: A vector of length 'batch' which indicates the number of
            frames for each video (before padding).
-
     Returns:
       A dictionary with a tensor containing the probability predictions of the
       model in the 'predictions' key. The dimensions of the tensor are
@@ -292,26 +344,92 @@ class LstmModel(models.BaseModel):
     """
     lstm_size = FLAGS.lstm_cells
     number_of_layers = FLAGS.lstm_layers
+    random_frames = FLAGS.lstm_random_sequence
+    iterations = FLAGS.iterations
+    backward = FLAGS.lstm_backward
+    moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
+
+    if random_frames:
+      num_frames_2 = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+      model_input = utils.SampleRandomFrames(model_input, num_frames_2,
+                                             iterations)
 
     stacked_lstm = tf.contrib.rnn.MultiRNNCell(
             [
                 tf.contrib.rnn.BasicLSTMCell(
-                    lstm_size, forget_bias=1.0)
+                    lstm_size, forget_bias=1.0, state_is_tuple=False)
                 for _ in range(number_of_layers)
-                ])
+                ], state_is_tuple=False)
 
     loss = 0.0
-
-    outputs, state = tf.nn.dynamic_rnn(stacked_lstm, model_input,
-                                       sequence_length=num_frames,
-                                       dtype=tf.float32)
+    with tf.variable_scope("RNN"):
+      outputs, state = tf.nn.dynamic_rnn(stacked_lstm, model_input,
+                                         sequence_length=num_frames,
+                                         dtype=tf.float32)
 
     aggregated_model = getattr(video_level_models,
                                FLAGS.video_level_classifier_model)
 
     return aggregated_model().create_model(
-        model_input=state[-1].h,
+        model_input=state,
         vocab_size=vocab_size,
+        is_training=is_training,
+        add_batch_norm=moe_add_batch_norm,
+        **unused_params)
+
+
+class GruModel(models.BaseModel):
+
+  def create_model(self, 
+                   model_input, 
+                   vocab_size, 
+                   num_frames,
+                   moe_add_batch_norm,
+                   is_training=True, 
+                   **unused_params):
+    """Creates a model which uses a stack of GRUs to represent the video.
+    Args:
+      model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
+                   input features.
+      vocab_size: The number of classes in the dataset.
+      num_frames: A vector of length 'batch' which indicates the number of
+           frames for each video (before padding).
+    Returns:
+      A dictionary with a tensor containing the probability predictions of the
+      model in the 'predictions' key. The dimensions of the tensor are
+      'batch_size' x 'num_classes'.
+    """
+    gru_size = FLAGS.gru_cells
+    number_of_layers = FLAGS.gru_layers
+    backward = FLAGS.gru_backward
+    random_frames = FLAGS.gru_random_sequence
+    iterations = FLAGS.iterations
+
+    moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
+    
+    if random_frames:
+      num_frames_2 = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+      model_input = utils.SampleRandomFrames(model_input, num_frames_2,
+                                             iterations)
+    
+    stacked_GRU = tf.contrib.rnn.MultiRNNCell(
+            [
+                tf.contrib.rnn.GRUCell(gru_size)
+                for _ in range(number_of_layers)
+                ], state_is_tuple=False)
+
+    with tf.variable_scope("RNN"):
+      outputs, state = tf.nn.dynamic_rnn(stacked_GRU, model_input,
+                                         sequence_length=num_frames,
+                                         dtype=tf.float32)
+
+    aggregated_model = getattr(video_level_models,
+                               FLAGS.video_level_classifier_model)
+    return aggregated_model().create_model(
+        model_input=state,
+        vocab_size=vocab_size,
+        is_training=is_training,
+        add_batch_norm=FLAGS.moe_add_batch_norm,
         **unused_params)
 
 class NetVLADModel(models.BaseModel):
