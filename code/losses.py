@@ -51,6 +51,19 @@ class CrossEntropyLoss(BaseLoss):
       return tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
 
 
+class SoftmaxCrossEntropyLoss(BaseLoss):
+  def calculate_loss(self, predictions, labels, **unused_params):
+    with tf.name_scope('loss_softmax_crossentropy'):
+      return tf.nn.softmax_cross_entropy_with_logits_v2(
+          labels=labels, logits=predictions)
+
+class SigmoidCrossEntropyLoss(BaseLoss):
+  def calculate_loss(self, predictions, labels, **unused_params):
+    with tf.name_scope('loss_softmax_crossentropy'):
+      return tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=labels, logits=predictions)
+
+
 class HingeLoss(BaseLoss):
   """Calculate the hinge loss between the predictions and labels.
 
