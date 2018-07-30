@@ -18,7 +18,10 @@ import tensorflow as tf
 import utils
 
 from tensorflow import logging
-def resize_axis(tensor, axis, new_size, fill_value=0):
+
+FLAGS = tf.app.flags.FLAGS
+
+def _resize_axis(tensor, axis, new_size, fill_value=0):
   """Truncates or pads a tensor to new_size on on a given axis.
 
   Truncate or extend tensor such that tensor.shape[axis] == new_size. If the
@@ -54,6 +57,52 @@ def resize_axis(tensor, axis, new_size, fill_value=0):
   new_shape[axis] = new_size
   resized.set_shape(new_shape)
   return resized
+
+def _resize_axis_for_data_augmentation(tensor, axis, new_size, fill_value=0):
+  tensor = tf.convert_to_tensor([[1, 2, 3], [4, 5, 6], [4, 5, 6]])
+  shape = tf.unstack(tf.shape(tensor))
+
+  if shape[0] % 2 == 0:
+    split_index = tf.stack([shape[0] / 2, shape[0] / 2])
+  else:
+    split_index = tf.stack([shape[0] // 2 + 1, shape[0] // 2])
+
+  # splited_tensor
+  up, down = tf.split(tensor, split_index)
+
+  up_shape = tf.unstack(tf.shape(up))
+  down_shape = tf.unstack(tf.shape(down))
+
+  up_pad_shape = up_shape[:]
+  up_pad_shape[axis] = tf.maximum(0, (new_size // 2 - up_shape[axis]))
+  up_shape[axis] = tf.minimum(up_shape[axis], new_size // 2)
+  up_shape = tf.stack(up_shape)
+
+  down_pad_shape = down_shape[:]
+  down_pad_shape[axis] = tf.maximum(0, (new_size // 2 - down_shape[axis]))
+  down_shape[axis] = tf.minimum(down_shape[axis], new_size // 2)
+  down_shape = tf.stack(down_shape)
+
+  resized = tf.concat([
+    up,
+    tf.fill(tf.stack(up_pad_shape), tf.cast(fill_value, tensor.dtype)),
+    down,
+    tf.fill(tf.stack(down_pad_shape), tf.cast(fill_value, tensor.dtype)),
+  ], axis)
+
+  # Update shape.
+  new_shape = tensor.get_shape().as_list()  # A copy is being made.
+  new_shape[axis] = new_size
+  resized.set_shape(new_shape)
+  return resized
+
+
+if FLAGS.data_augmentation:
+  resize_axis = _resize_axis_for_data_augmentation
+else:
+  resize_axis = _resize_axis
+
+
 
 class BaseReader(object):
   """Inherit from this class when implementing new readers."""

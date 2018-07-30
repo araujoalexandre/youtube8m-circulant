@@ -104,6 +104,9 @@ if __name__ == "__main__":
       "Whether to write the device on which every op will run into the "
       "logs on startup.")
 
+  flags.DEFINE_bool('data_augmentation', False, 
+                    "Activate the pseudo data augmentation")
+
 def validate_class_name(flag_value, category, modules, expected_superclass):
   """Checks that the given string matches a class of the expected type.
 
@@ -256,6 +259,12 @@ def build_graph(reader,
   feature_dim = len(model_input_raw.get_shape()) - 1
 
   model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
+
+  if FLAGS.data_augmentation:
+    _, dim_num_feature, dim_feature_size = model_input.get_shape()
+    model_input = tf.reshape(model_input, (-1, dim_num_feature // 2, dim_feature_size))
+    _, dim_vocab_size = labels_batch.get_shape()
+    labels_batch = tf.reshape(tf.tile(labels_batch, [1, 2]), (-1, dim_vocab_size))
 
   tower_inputs = tf.split(model_input, num_towers)
   tower_labels = tf.split(labels_batch, num_towers)
