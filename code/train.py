@@ -22,7 +22,7 @@ import export_model
 import losses
 import frame_level_models
 import video_level_models
-# import readers
+import readers
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from tensorflow import app
@@ -106,9 +106,6 @@ if __name__ == "__main__":
 
   flags.DEFINE_bool('data_augmentation', False, 
                     "Activate the pseudo data augmentation")
-
-# ugly hack
-import readers
 
 def validate_class_name(flag_value, category, modules, expected_superclass):
   """Checks that the given string matches a class of the expected type.
