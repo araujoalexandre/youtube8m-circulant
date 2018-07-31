@@ -261,6 +261,7 @@ def build_graph(reader,
   model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
 
   if FLAGS.data_augmentation:
+    logging.info('=> Data augmentation activated !')
     max_features = model_input.get_shape().as_list()[1]
     feature_size = model_input.get_shape().as_list()[2]
     assert max_features % 2 == 0
@@ -275,13 +276,13 @@ def build_graph(reader,
     lenght = FLAGS.batch_size
     num_frames = tf.tile(num_frames, [2, 1])
     num_frames = tf.transpose(num_frames)
-    num_frames = tf.reshape(num_frames, (1, lenght * 2))
+    num_frames = tf.reshape(num_frames, (1, lenght * num_towers * 2))
     num_frames = num_frames // 2
 
     # create mask for non even nomber of frame
     mod_num_frames = tf.squeeze(tf.stack((mod_num_frames, tf.zeros_like(mod_num_frames))))
     mod_num_frames = tf.transpose(mod_num_frames)
-    mod_num_frames = tf.reshape(mod_num_frames, (1, lenght * 2))
+    mod_num_frames = tf.reshape(mod_num_frames, (1, lenght * num_towers * 2))
 
     # finalize
     num_frames = num_frames + mod_num_frames
