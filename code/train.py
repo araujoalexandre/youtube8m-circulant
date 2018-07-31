@@ -651,11 +651,11 @@ def get_reader():
 
   if FLAGS.frame_features:
     reader = readers.YT8MFrameFeatureReader(
-        feature_names=feature_names, feature_sizes=feature_sizes)
-  else:
-    reader = readers.YT8MAggregatedFeatureReader(
         feature_names=feature_names, feature_sizes=feature_sizes, 
         is_training=True, data_augmentation=FLAGS.data_augmentation)
+  else:
+    reader = readers.YT8MAggregatedFeatureReader(
+        feature_names=feature_names, feature_sizes=feature_sizes)
 
   return reader
 
