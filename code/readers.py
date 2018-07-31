@@ -97,13 +97,6 @@ def _resize_axis_for_data_augmentation(tensor, axis, new_size, fill_value=0):
   return resized
 
 
-if FLAGS.data_augmentation:
-  resize_axis = _resize_axis_for_data_augmentation
-else:
-  resize_axis = _resize_axis
-
-
-
 class BaseReader(object):
   """Inherit from this class when implementing new readers."""
 
@@ -190,7 +183,9 @@ class YT8MFrameFeatureReader(BaseReader):
                num_classes=3862,
                feature_sizes=[1024, 128],
                feature_names=["rgb", "audio"],
-               max_frames=300):
+               max_frames=300, 
+               is_training=False, 
+               data_augmentation=False):
     """Construct a YT8MFrameFeatureReader.
 
     Args:
@@ -208,6 +203,11 @@ class YT8MFrameFeatureReader(BaseReader):
     self.feature_sizes = feature_sizes
     self.feature_names = feature_names
     self.max_frames = max_frames
+
+    if is_training and data_augmentation: 
+      self.resize_axis = _resize_axis_for_data_augmentation
+    else:
+      self.resize_axis = _resize_axis
 
   def get_video_matrix(self,
                        features,
@@ -236,7 +236,7 @@ class YT8MFrameFeatureReader(BaseReader):
     feature_matrix = utils.Dequantize(decoded_features,
                                       max_quantized_value,
                                       min_quantized_value)
-    feature_matrix = resize_axis(feature_matrix, 0, max_frames)
+    feature_matrix = self.resize_axis(feature_matrix, 0, max_frames)
     return feature_matrix, num_frames
 
   def prepare_reader(self,
