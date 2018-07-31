@@ -60,12 +60,12 @@ def _resize_axis(tensor, axis, new_size, fill_value=0):
 
 def _resize_axis_for_data_augmentation(tensor, axis, new_size, fill_value=0):
   tensor = tf.convert_to_tensor(tensor)
+  tensor = tensor[:new_size, ...]
   shape = tf.unstack(tf.shape(tensor))
 
-  if shape[0] % 2 == 0:
-    split_index = tf.stack([shape[0] / 2, shape[0] / 2])
-  else:
-    split_index = tf.stack([shape[0] // 2 + 1, shape[0] // 2])
+  def f1(): return tf.stack([shape[0] // 2, shape[0] // 2])
+  def f2(): return tf.stack([shape[0] // 2 + 1, shape[0] // 2])
+  split_index = tf.cond(tf.equal(tf.mod(shape[0], 2), 0), true_fn=f1, false_fn=f2)
 
   # splited_tensor
   up, down = tf.split(tensor, split_index)
@@ -75,13 +75,8 @@ def _resize_axis_for_data_augmentation(tensor, axis, new_size, fill_value=0):
 
   up_pad_shape = up_shape[:]
   up_pad_shape[axis] = tf.maximum(0, (new_size // 2 - up_shape[axis]))
-  up_shape[axis] = tf.minimum(up_shape[axis], new_size // 2)
-  up_shape = tf.stack(up_shape)
-
   down_pad_shape = down_shape[:]
   down_pad_shape[axis] = tf.maximum(0, (new_size // 2 - down_shape[axis]))
-  down_shape[axis] = tf.minimum(down_shape[axis], new_size // 2)
-  down_shape = tf.stack(down_shape)
 
   resized = tf.concat([
     up,
