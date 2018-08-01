@@ -56,14 +56,14 @@ class SoftmaxCrossEntropyLoss(BaseLoss):
     with tf.name_scope('loss_softmax_crossentropy'):
       float_labels = tf.cast(labels, tf.float32)
       return tf.nn.softmax_cross_entropy_with_logits_v2(
-          labels=float_labels, logits=predictions)
+          labels=float_labels, logits=predictions, label_smoothing=0.1)
 
 class SigmoidCrossEntropyLoss(BaseLoss):
   def calculate_loss(self, predictions, labels, **unused_params):
     with tf.name_scope('loss_softmax_crossentropy'):
       float_labels = tf.cast(labels, tf.float32)
       return tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=float_labels, logits=predictions)
+                labels=float_labels, logits=predictions, label_smoothing=0.1)
 
 
 class HingeLoss(BaseLoss):
