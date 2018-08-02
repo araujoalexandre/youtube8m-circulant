@@ -2079,12 +2079,12 @@ class EnsemblePoolingEarlyConcatWithFC(models.BaseModel):
 
     def attention_pooling(input_, out_dim):
       # pooling method with low rank matrix
-      feature_size = input_.get_shape()[2]
+      feature_size = input_.get_shape().as_list()[2]
       init = tf.random_normal_initializer(mean=1.0, 
         stddev=1/math.sqrt(feature_size))
-      a = tf.get_variable("a_attention_polling",
+      a = tf.get_variable("a_attention_pooling",
         [feature_size, out_dim], initializer=init)
-      b = tf.get_variable("b_attention_polling",
+      b = tf.get_variable("b_attention_pooling",
         [feature_size, out_dim], initializer=init)
       m1 = tf.tensordot(input_, a, 1)
       m2 = tf.tensordot(input_, b, 1)
@@ -2101,6 +2101,7 @@ class EnsemblePoolingEarlyConcatWithFC(models.BaseModel):
           if len(model_inputs) > 1:
             for model_input in model_inputs:
               dbof = dbof_cls.forward(model_input)
+              dbof = make_fc(dbof, 'dbof')
               list_dbof.append(dbof)
             # dbof = tf.add_n(list_dbof) / len(list_dbof)
             dbof = attention_pooling(tf.stack(list_dbof, 1), fc_hidden_size)
@@ -2115,6 +2116,7 @@ class EnsemblePoolingEarlyConcatWithFC(models.BaseModel):
           if len(model_inputs) > 1:
             for model_input in model_inputs:
               netvlad = netvlad_cls.forward(model_input)
+              netvlad = make_fc(netvlad, 'netvlad')
               list_vlad.append(netvlad)
             # netvlad = tf.add_n(list_vlad) / len(list_vlad)
             netvlad = attention_pooling(tf.stack(list_vlad, 1), fc_hidden_size)
@@ -2130,6 +2132,7 @@ class EnsemblePoolingEarlyConcatWithFC(models.BaseModel):
           if len(model_inputs) > 1:
             for model_input in model_inputs:
               fv = netfv_cls.forward(model_input)
+              fv = make_fc(fv, 'fv')
               list_fv.append(fv)
             # fv = tf.add_n(list_fv) / len(list_fv)
             fv = attention_pooling(tf.stack(list_fv, 1), fc_hidden_size)
