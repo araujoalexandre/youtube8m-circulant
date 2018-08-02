@@ -1885,32 +1885,34 @@ class EnsembleEarlyConcatAverageWithFC(models.BaseModel):
             dbof = dbof_cls.forward(model_inputs[0])
           dbof = make_fc(dbof, 'dbof')
 
-        with tf.variable_scope("NetVLAD_{}".format(name), reuse=tf.AUTO_REUSE):
-          netvlad_cls = NetVLAD(size, max_frames, netvlad_cluster_size, 
-           embedding_add_batch_norm, is_training)
-          list_vlad = []
-          if len(model_inputs) > 1:
-            for model_input in model_inputs:
-              netvlad = netvlad_cls.forward(model_input)
-              list_vlad.append(netvlad)
-            netvlad = tf.add_n(list_vlad) / len(list_vlad)
-          else:
-            netvlad = netvlad_cls.forward(model_inputs[0])
-          netvlad = make_fc(netvlad, 'netvlad')
+        with tf.control_dependencies([dbof]):
+          with tf.variable_scope("NetVLAD_{}".format(name), reuse=tf.AUTO_REUSE):
+            netvlad_cls = NetVLAD(size, max_frames, netvlad_cluster_size, 
+             embedding_add_batch_norm, is_training)
+            list_vlad = []
+            if len(model_inputs) > 1:
+              for model_input in model_inputs:
+                netvlad = netvlad_cls.forward(model_input)
+                list_vlad.append(netvlad)
+              netvlad = tf.add_n(list_vlad) / len(list_vlad)
+            else:
+              netvlad = netvlad_cls.forward(model_inputs[0])
+            netvlad = make_fc(netvlad, 'netvlad')
 
-        with tf.variable_scope("Fisher_vector_{}".format(name), reuse=tf.AUTO_REUSE):
-          netfv_cls = NetFV(size, max_frames, fv_cluster_size, 
-            embedding_add_batch_norm, fv_couple_weights, fv_coupling_factor, 
-            is_training)
-          list_fv = []
-          if len(model_inputs) > 1:
-            for model_input in model_inputs:
-              fv = netfv_cls.forward(model_input)
-              list_fv.append(fv)
-            fv = tf.add_n(list_fv) / len(list_fv)
-          else:
-            fv = netfv_cls.forward(model_inputs[0])
-          fv = make_fc(fv, 'fv')
+        with tf.control_dependencies([netvlad]):
+          with tf.variable_scope("Fisher_vector_{}".format(name), reuse=tf.AUTO_REUSE):
+            netfv_cls = NetFV(size, max_frames, fv_cluster_size, 
+              embedding_add_batch_norm, fv_couple_weights, fv_coupling_factor, 
+              is_training)
+            list_fv = []
+            if len(model_inputs) > 1:
+              for model_input in model_inputs:
+                fv = netfv_cls.forward(model_input)
+                list_fv.append(fv)
+              fv = tf.add_n(list_fv) / len(list_fv)
+            else:
+              fv = netfv_cls.forward(model_inputs[0])
+            fv = make_fc(fv, 'fv')
 
       return dbof, netvlad, fv
 
