@@ -2538,15 +2538,21 @@ class EnsembleEarlyConcatAverageWithFCv2(models.BaseModel):
       if not circulant:
         dim = input_.get_shape().as_list()[1] 
         fc_hidden_weights = tf.get_variable("{}_fc_hidden_weights".format(name),
-          [dim, fc_hidden_size],
-          initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(fc_hidden_size)))
-        return tf.matmul(input_, fc_hidden_weights)
+          [dim, fc_hidden_size], initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(fc_hidden_size)))
+        activation = tf.matmul(input_, fc_hidden_weights)
       else:
-        initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(fc_hidden_size))
         input_dim = input_.get_shape().as_list()
         circ_layer_hidden = CirculantLayerWithFactor(input_dim, fc_hidden_size, 
-                    k_factor=k_factor, initializer=initializer)
-        return circ_layer_hidden.matmul(input_)
+                    k_factor=k_factor, initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(fc_hidden_size)))
+        fc_hidden_biases = tf.get_variable("{}_fc_hidden_biases".format(name),
+          [fc_hidden_size], initializer = tf.random_normal_initializer(stddev=0.01))
+        activation = circ_layer_hidden.matmul(input_)
+
+      fc_hidden_biases = tf.get_variable("{}_fc_hidden_biases".format(name),
+        [fc_hidden_size], initializer = tf.random_normal_initializer(stddev=0.01))    
+      activation += fc_hidden_biases
+      activation = tf.nn.relu6(activation)
+      return activation
 
 
     def make_embedding(model_inputs, size, 
