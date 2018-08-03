@@ -88,6 +88,20 @@ def FramePooling(frames, method, **unused_params):
     return tf.reduce_mean(frames, 1)
   elif method == "max":
     return tf.reduce_max(frames, 1)
+  elif method == "atention":
+    # pooling method with low rank matrix
+    feature_size = frames.get_shape()[2]
+    init = tf.random_normal_initializer(mean=1.0, 
+      stddev=1/numpy.sqrt(feature_size))
+    a = tf.get_variable("a_attention_polling",
+      [feature_size, unused_params["out_dim"]], initializer=init)
+    b = tf.get_variable("b_attention_polling",
+      [feature_size, unused_params["out_dim"]], initializer=init)
+    m1 = tf.tensordot(frames, a, 1)
+    m2 = tf.tensordot(frames, b, 1)
+    return tf.reduce_sum(tf.multiply(m1, m2), 1)
+  elif method == "l2_norm":
+    return tf.sqrt(tf.reduce_sum(tf.pow(frames, 2), 1))
   elif method == "none":
     feature_size = frames.shape_as_list()[2]
     return tf.reshape(frames, [-1, feature_size])
