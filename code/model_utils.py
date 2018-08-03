@@ -101,7 +101,7 @@ def FramePooling(frames, method, **unused_params):
     m2 = tf.tensordot(frames, b, 1)
     return tf.reduce_sum(tf.multiply(m1, m2), 1)
   elif method == "l2_norm":
-    frames_max = tf.reduce_max(frames)
+    frames_max = tf.reduce_max([tf.reduce_max(frames), 1e-4])
     return frames_max * tf.sqrt(tf.reduce_sum(tf.pow(frames / frames_max, 2), 1))
   elif method == "none":
     feature_size = frames.shape_as_list()[2]

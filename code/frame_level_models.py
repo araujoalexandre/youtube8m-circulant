@@ -2327,7 +2327,7 @@ class EnsembleEarlyConcatL2NormWithFC(models.BaseModel):
               list_dbof.append(dbof)
             # dbof = tf.add_n(list_dbof) / len(list_dbof)
             list_dbof = tf.stack(list_dbof, 1)
-            list_dbof_max = tf.reduce_max(list_dbof)
+            list_dbof_max = tf.reduce_max([tf.reduce_max(list_dbof), 1e-4])
             dbof = list_dbof_max * tf.sqrt(tf.reduce_sum(tf.pow(list_dbof / list_dbof_max, 2), 1))
           else:
             dbof = dbof_cls.forward(model_inputs[0])
@@ -2344,7 +2344,7 @@ class EnsembleEarlyConcatL2NormWithFC(models.BaseModel):
                 list_vlad.append(netvlad)
               # netvlad = tf.add_n(list_vlad) / len(list_vlad)
               list_vlad = tf.stack(list_vlad, 1)
-              list_vlad_max = tf.reduce_max(list_vlad)
+              list_vlad_max = tf.reduce_max([tf.reduce_max(list_vlad), 1e-4])
               netvlad = list_vlad_max * tf.sqrt(tf.reduce_sum(tf.pow(list_vlad / list_vlad_max, 2), 1))
             else:
               netvlad = netvlad_cls.forward(model_inputs[0])
@@ -2362,7 +2362,7 @@ class EnsembleEarlyConcatL2NormWithFC(models.BaseModel):
                 list_fv.append(fv)
               # fv = tf.add_n(list_fv) / len(list_fv)
               list_fv = tf.stack(list_fv, 1)
-              list_fv_max = tf.reduce_max(list_fv)
+              list_fv_max = tf.reduce_max([tf.reduce_max(list_fv), 1e-4])
               fv = list_fv_max * tf.sqrt(tf.reduce_sum(tf.pow(list_fv * list_fv_max, 2), 1))
             else:
               fv = netfv_cls.forward(model_inputs[0])
