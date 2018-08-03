@@ -2523,7 +2523,8 @@ class EnsembleEarlyConcatAverageWithFCv2(models.BaseModel):
             center=True,
             scale=True,
             is_training=is_training,
-            scope="input_bn_{}".format(id_))
+            scope="input_bn",
+            reuse=tf.AUTO_REUSE)
       return reshaped_input, max_frames
 
     sample_model_inputs_video = []
@@ -2655,6 +2656,224 @@ class EnsembleEarlyConcatAverageWithFCv2(models.BaseModel):
         is_training=is_training,
         add_batch_norm=moe_add_batch_norm,
         **unused_params)
+
+
+
+class EnsembleEarlyConcatAverageWithFCv3(models.BaseModel):
+  """Creates a Deep Bag of Frames model.
+
+  The model projects the features for each frame into a higher dimensional
+  'clustering' space, pools across frames in that space, and then
+  uses a configurable video-level model to classify the now aggregated features.
+
+  The model will randomly sample either frames or sequences of frames during
+  training to speed up convergence.
+
+  Args:
+    model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
+                 input features.
+    vocab_size: The number of classes in the dataset.
+    num_frames: A vector of length 'batch' which indicates the number of
+         frames for each video (before padding).
+
+  Returns:
+    A dictionary with a tensor containing the probability predictions of the
+    model in the 'predictions' key. The dimensions of the tensor are
+    'batch_size' x 'num_classes'.
+  """
+
+  def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_frames,
+                   iterations=None,
+                   sample_random_frames=None,
+                   input_add_batch_norm=None,
+                   n_bagging=None,
+                   embedding_add_batch_norm=None,
+                   dbof_cluster_size=None,
+                   netvlad_cluster_size=None,
+                   fv_cluster_size=None,
+                   fv_couple_weights=None,
+                   fv_coupling_factor=None,
+                   
+                   fc_dbof_circulant=None,
+                   fc_netvlad_circulant=None,
+                   fc_fisher_circulant=None,
+
+                   fc_hidden_size=None,
+                   fc_add_batch_norm=None,
+                   fc_circulant=None,
+                   fc_gating=None,
+                   k_factor=None,
+                   moe_add_batch_norm=None,
+                   is_training=True,
+                   **unused_params):
+
+    iterations = iterations or FLAGS.iterations
+    random_frames = sample_random_frames or FLAGS.sample_random_frames
+    input_add_batch_norm = input_add_batch_norm or FLAGS.input_add_batch_norm
+
+    n_bagging = n_bagging or FLAGS.n_bagging
+    
+    embedding_add_batch_norm = embedding_add_batch_norm or FLAGS.embedding_add_batch_norm
+
+    dbof_cluster_size = dbof_cluster_size or FLAGS.dbof_cluster_size
+    netvlad_cluster_size = netvlad_cluster_size or FLAGS.netvlad_cluster_size
+    fv_cluster_size = fv_cluster_size or FLAGS.fv_cluster_size
+    fv_couple_weights = fv_couple_weights or FLAGS.fv_couple_weights
+    fv_coupling_factor = fv_coupling_factor or FLAGS.fv_coupling_factor
+
+    fc_dbof_circulant = fc_dbof_circulant or FLAGS.fc_dbof_circulant
+    fc_netvlad_circulant = fc_netvlad_circulant or FLAGS.fc_netvlad_circulant
+    fc_fisher_circulant = fc_fisher_circulant or FLAGS.fc_fisher_circulant
+
+    fc_add_batch_norm = fc_add_batch_norm or FLAGS.fc_add_batch_norm
+    fc_hidden_size = fc_hidden_size or FLAGS.fc_hidden_size
+    fc_circulant = fc_circulant or FLAGS.fc_circulant
+    k_factor = k_factor or FLAGS.k_factor
+    fc_gating = fc_gating or FLAGS.fc_gating
+
+    moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
+
+
+    def get_input(id_):
+      num_frames_cast = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+      if random_frames:
+        sample_model_input = utils.SampleRandomFrames(model_input, num_frames_cast, iterations)
+      else:
+        sample_model_input = utils.SampleRandomSequence(model_input, num_frames_cast, iterations)
+      max_frames = sample_model_input.get_shape().as_list()[1]
+      feature_size = sample_model_input.get_shape().as_list()[2]
+      reshaped_input = tf.reshape(sample_model_input, [-1, feature_size])
+      tf.summary.histogram("input_hist_{}".format(id_), reshaped_input)
+      if input_add_batch_norm:
+        reshaped_input = slim.batch_norm(
+            reshaped_input,
+            center=True,
+            scale=True,
+            is_training=is_training,
+            scope="input_bn",
+            reuse=tf.AUTO_REUSE)
+      return reshaped_input, max_frames
+
+    sample_model_inputs_video = []
+    sample_model_inputs_audio = []
+    for i in range(n_bagging):
+      sample_model_input, max_frames = get_input(i)
+      sample_model_inputs_video.append(sample_model_input[:, 0:1024])
+      sample_model_inputs_audio.append(sample_model_input[:, 1024:])
+
+
+    def make_fc(input_, name, circulant, batch_norm):
+      with tf.variable_scope(name):
+        if not circulant:
+          dim = input_.get_shape().as_list()[1] 
+          fc_hidden_weights = tf.get_variable("{}_fc_hidden_weights".format(name),
+            [dim, fc_hidden_size], initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(fc_hidden_size)))
+          activation = tf.matmul(input_, fc_hidden_weights)
+        else:
+          input_dim = input_.get_shape().as_list()
+          circ_layer_hidden = CirculantLayerWithFactor(input_dim, fc_hidden_size, 
+                      k_factor=k_factor, initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(fc_hidden_size)))
+          fc_hidden_biases = tf.get_variable("{}_fc_hidden_biases".format(name),
+            [fc_hidden_size], initializer = tf.random_normal_initializer(stddev=0.01))
+          activation = circ_layer_hidden.matmul(input_)
+
+        if fc_add_batch_norm:
+          activation = slim.batch_norm(
+              activation,
+              center=True,
+              scale=True,
+              is_training=is_training,
+              scope="{}_fc_hidden_bn".format(name))
+        else:
+          fc_hidden_biases = tf.get_variable("{}_fc_hidden_biases".format(name),
+            [fc_hidden_size],
+            initializer = tf.random_normal_initializer(stddev=0.01))
+          tf.summary.histogram("fc_hidden_biases", fc_hidden_biases)
+          activation += fc_hidden_biases
+      activation = tf.nn.relu6(activation)
+      return activation
+
+
+    def make_embedding(model_inputs, size, 
+      dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, name):
+      with tf.variable_scope(name):
+
+        with tf.variable_scope("DBoF_{}".format(name), reuse=tf.AUTO_REUSE):
+          dbof_cls = DBof(size, max_frames, dbof_cluster_size, 
+            FLAGS.dbof_pooling_method, embedding_add_batch_norm, is_training)
+          list_dbof = []
+          if len(model_inputs) > 1:
+            for model_input in model_inputs:
+              dbof = dbof_cls.forward(model_input)
+              list_dbof.append(dbof)
+            dbof = tf.add_n(list_dbof) / len(list_dbof)
+          else:
+            dbof = dbof_cls.forward(model_inputs[0])
+          dbof = make_fc(dbof, 'dbof', fc_dbof_circulant, True)
+
+        with tf.control_dependencies([dbof]):
+          with tf.variable_scope("NetVLAD_{}".format(name), reuse=tf.AUTO_REUSE):
+            netvlad_cls = NetVLAD(size, max_frames, netvlad_cluster_size, 
+             embedding_add_batch_norm, is_training)
+            list_vlad = []
+            if len(model_inputs) > 1:
+              for model_input in model_inputs:
+                netvlad = netvlad_cls.forward(model_input)
+                list_vlad.append(netvlad)
+              netvlad = tf.add_n(list_vlad) / len(list_vlad)
+            else:
+              netvlad = netvlad_cls.forward(model_inputs[0])
+            netvlad = make_fc(netvlad, 'netvlad', fc_netvlad_circulant, True)
+
+        with tf.control_dependencies([netvlad]):
+          with tf.variable_scope("Fisher_vector_{}".format(name), reuse=tf.AUTO_REUSE):
+            netfv_cls = NetFV(size, max_frames, fv_cluster_size, 
+              embedding_add_batch_norm, fv_couple_weights, fv_coupling_factor, 
+              is_training)
+            list_fv = []
+            if len(model_inputs) > 1:
+              for model_input in model_inputs:
+                fv = netfv_cls.forward(model_input)
+                list_fv.append(fv)
+              fv = tf.add_n(list_fv) / len(list_fv)
+            else:
+              fv = netfv_cls.forward(model_inputs[0])
+            fv = make_fc(fv, 'fv', fc_fisher_circulant, True)
+
+      return dbof, netvlad, fv
+
+    dbof_video, netvlad_video, fv_video = make_embedding(sample_model_inputs_video, 1024, 
+      dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, 'video')
+    dbof_audio, netvlad_audio, fv_audio = make_embedding(sample_model_inputs_audio, 128, 
+      dbof_cluster_size // 2, netvlad_cluster_size // 2, fv_cluster_size // 2, 'audio')
+
+    video_activation = tf.concat([dbof_video, netvlad_video, fv_video], 1) 
+    video_activation = make_fc(video_activation, 'merge_video_embedding', fc_circulant, fc_add_batch_norm)
+
+    audio_activation = tf.concat([dbof_audio, netvlad_audio, fv_audio], 1)
+    audio_activation = make_fc(video_activation, 'merge_video_embedding', fc_circulant, fc_add_batch_norm)
+
+    activation = tf.concat([video_activation, audio_activation], 1)
+    activation = make_fc(activation, 'final_fc', fc_circulant, fc_add_batch_norm)
+
+    if fc_gating:
+      with tf.variable_scope('gating_frame_level'):
+        activation = context_gating(activation, fc_add_batch_norm, is_training)
+
+    aggregated_model = getattr(video_level_models,
+                               FLAGS.video_level_classifier_model)
+    return aggregated_model().create_model(
+        model_input=activation,
+        vocab_size=vocab_size,
+        is_training=is_training,
+        add_batch_norm=moe_add_batch_norm,
+        **unused_params)
+
+
+
 
 
 
