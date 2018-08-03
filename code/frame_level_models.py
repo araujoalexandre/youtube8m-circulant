@@ -2854,7 +2854,7 @@ class EnsembleEarlyConcatAverageWithFCv3(models.BaseModel):
     video_activation = make_fc(video_activation, 'merge_video_embedding', fc_circulant, fc_add_batch_norm)
 
     audio_activation = tf.concat([dbof_audio, netvlad_audio, fv_audio], 1)
-    audio_activation = make_fc(video_activation, 'merge_video_embedding', fc_circulant, fc_add_batch_norm)
+    audio_activation = make_fc(video_activation, 'merge_audio_embedding', fc_circulant, fc_add_batch_norm)
 
     activation = tf.concat([video_activation, audio_activation], 1)
     activation = make_fc(activation, 'final_fc', fc_circulant, fc_add_batch_norm)
