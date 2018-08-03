@@ -2286,7 +2286,8 @@ class EnsembleEarlyConcatL2NormWithFC(models.BaseModel):
             center=True,
             scale=True,
             is_training=is_training,
-            scope="input_bn_{}".format(id_))
+            scope="input_bn",
+            reuse=tf.AUTO_REUSE)
       return reshaped_input, max_frames
 
     sample_model_inputs_video = []
