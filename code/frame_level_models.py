@@ -2363,7 +2363,7 @@ class EnsembleEarlyConcatL2NormWithFC(models.BaseModel):
               # fv = tf.add_n(list_fv) / len(list_fv)
               list_fv = tf.stack(list_fv, 1)
               list_fv_max = tf.reduce_max([tf.reduce_max(list_fv), 1e-4])
-              fv = list_fv_max * tf.sqrt(tf.reduce_sum(tf.pow(list_fv * list_fv_max, 2), 1))
+              fv = list_fv_max * tf.sqrt(tf.reduce_sum(tf.pow(list_fv / list_fv_max, 2), 1))
             else:
               fv = netfv_cls.forward(model_inputs[0])
             fv = make_fc(fv, 'fv')
