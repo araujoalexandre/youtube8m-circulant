@@ -3105,7 +3105,7 @@ class EnsembleEarlyConcatAverageWithFCv4(models.BaseModel):
 
 
 
-class EnsembleEarlyConcatAverageWithFCv4(models.BaseModel):
+class EnsembleEarlyConcatAverageWithFCv5(models.BaseModel):
   """Creates a Deep Bag of Frames model.
 
   The model projects the features for each frame into a higher dimensional
