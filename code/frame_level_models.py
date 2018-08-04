@@ -2952,7 +2952,7 @@ class EnsembleEarlyConcatAverageWithFCv4(models.BaseModel):
     moe_add_batch_norm = moe_add_batch_norm or FLAGS.moe_add_batch_norm
 
 
-    def get_input(id_):
+    def get_input():
       num_frames_cast = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
       if random_frames:
         sample_model_input = utils.SampleRandomFrames(model_input, num_frames_cast, iterations)
@@ -2961,7 +2961,7 @@ class EnsembleEarlyConcatAverageWithFCv4(models.BaseModel):
       max_frames = sample_model_input.get_shape().as_list()[1]
       feature_size = sample_model_input.get_shape().as_list()[2]
       reshaped_input = tf.reshape(sample_model_input, [-1, feature_size])
-      tf.summary.histogram("input_hist_{}".format(id_), reshaped_input)
+      tf.summary.histogram("input", reshaped_input)
       if input_add_batch_norm:
         reshaped_input = slim.batch_norm(
             reshaped_input,
@@ -2970,12 +2970,12 @@ class EnsembleEarlyConcatAverageWithFCv4(models.BaseModel):
             is_training=is_training,
             scope="input_bn",
             reuse=tf.AUTO_REUSE)
-      return reshaped_input, max_frames
+      return reshaped_input, max_frames, feature_size
 
     sample_model_inputs_video = []
     sample_model_inputs_audio = []
     for i in range(n_bagging):
-      sample_model_input, max_frames = get_input(i)
+      sample_model_input, max_frames, feature_size = get_input()
       sample_model_inputs_video.append(sample_model_input[:, 0:1024])
       sample_model_inputs_audio.append(sample_model_input[:, 1024:])
 
@@ -3063,11 +3063,13 @@ class EnsembleEarlyConcatAverageWithFCv4(models.BaseModel):
             list_stat = []
             if len(model_inputs) > 1:
               for model_input in model_inputs:
+                model_input = tf.reshape(model_input, [-1, max_frames, feature_size])
                 moment1, moment2 = tf.nn.moments(model_input, axes=1)
                 moments = tf.concat([moment1, moment2], 1)
                 list_stat.append(moments)
-              moments = tf.add_n(list_stat) / len(list_fv)
+              moments = tf.add_n(list_stat) / len(list_stat)
             else:
+              model_input = tf.reshape(model_input, [-1, max_frames, feature_size])
               moment1, moment2 = tf.nn.moments(model_input, axes=1)
               moments = tf.concat([moment1, moment2], 1)
             moments = make_fc(moments, "moments", fc_moment_circulant, True)
