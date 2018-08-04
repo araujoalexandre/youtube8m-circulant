@@ -3063,13 +3063,13 @@ class EnsembleEarlyConcatAverageWithFCv4(models.BaseModel):
             list_stat = []
             if len(model_inputs) > 1:
               for model_input in model_inputs:
-                model_input = tf.reshape(model_input, [-1, max_frames, feature_size])
+                model_input = tf.reshape(model_input, [-1, max_frames, size])
                 moment1, moment2 = tf.nn.moments(model_input, axes=1)
                 moments = tf.concat([moment1, moment2], 1)
                 list_stat.append(moments)
               moments = tf.add_n(list_stat) / len(list_stat)
             else:
-              model_input = tf.reshape(model_input, [-1, max_frames, feature_size])
+              model_input = tf.reshape(model_input, [-1, max_frames, size])
               moment1, moment2 = tf.nn.moments(model_input, axes=1)
               moments = tf.concat([moment1, moment2], 1)
             moments = make_fc(moments, "moments", fc_moment_circulant, True)
