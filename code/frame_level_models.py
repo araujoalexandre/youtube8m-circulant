@@ -3720,7 +3720,7 @@ class EnsembleEarlyConcatAverageWithFCv7(models.BaseModel):
       sample_model_inputs_audio.append(sample_model_input[:, 1024:])
 
 
-    def make_fc(input_, type_, name, circulant, batch_norm, size):
+    def make_fc(input_, type_, name, circulant, batch_norm):
       if type_ == "video":
         size = fc_hidden_size
       elif type_ == "audio":
