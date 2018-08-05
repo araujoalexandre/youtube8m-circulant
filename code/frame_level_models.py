@@ -3841,7 +3841,7 @@ class EnsembleEarlyConcatAverageWithFCv7(models.BaseModel):
               fv = tf.add_n(list_fv) / len(list_fv)
             else:
               fv = netfv_cls.forward(model_inputs[0])
-            fv = make_fc(fv, 'fv', fc_fisher_circulant, True)
+            fv = make_fc(fv, name, 'fv', fc_fisher_circulant, True)
 
         with tf.control_dependencies([fv]):
           with tf.variable_scope("avg_var_pool_{}".format(name), reuse=tf.AUTO_REUSE):
