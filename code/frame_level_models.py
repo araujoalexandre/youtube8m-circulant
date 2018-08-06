@@ -4061,57 +4061,51 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
           embeddings.append(dbof)
 
         if FLAGS.add_netvlad:
-          last = embeddings[-1] if embeddings else None
-          with tf.control_dependencies([last]):
-            with tf.variable_scope("NetVLAD_{}".format(name), reuse=tf.AUTO_REUSE):
-              netvlad_cls = NetVLAD(size, max_frames, netvlad_cluster_size, 
-               embedding_add_batch_norm, is_training)
-              list_vlad = []
-              if len(model_inputs) > 1:
-                for model_input in model_inputs:
-                  netvlad = netvlad_cls.forward(model_input)
-                  list_vlad.append(netvlad)
-                netvlad = tf.add_n(list_vlad) / len(list_vlad)
-              else:
-                netvlad = netvlad_cls.forward(model_inputs[0])
-              netvlad = make_fc(netvlad, 'netvlad', fc_netvlad_circulant, True)
+          with tf.variable_scope("NetVLAD_{}".format(name), reuse=tf.AUTO_REUSE):
+            netvlad_cls = NetVLAD(size, max_frames, netvlad_cluster_size, 
+             embedding_add_batch_norm, is_training)
+            list_vlad = []
+            if len(model_inputs) > 1:
+              for model_input in model_inputs:
+                netvlad = netvlad_cls.forward(model_input)
+                list_vlad.append(netvlad)
+              netvlad = tf.add_n(list_vlad) / len(list_vlad)
+            else:
+              netvlad = netvlad_cls.forward(model_inputs[0])
+            netvlad = make_fc(netvlad, 'netvlad', fc_netvlad_circulant, True)
           embeddings.append(netvlad)
 
         if FLAGS.add_fisher_vector:
-          last = embeddings[-1] if embeddings else None
-          with tf.control_dependencies([last]):
-            with tf.variable_scope("Fisher_vector_{}".format(name), reuse=tf.AUTO_REUSE):
-              netfv_cls = NetFV(size, max_frames, fv_cluster_size, 
-                embedding_add_batch_norm, fv_couple_weights, fv_coupling_factor, 
-                is_training)
-              list_fv = []
-              if len(model_inputs) > 1:
-                for model_input in model_inputs:
-                  fv = netfv_cls.forward(model_input)
-                  list_fv.append(fv)
-                fv = tf.add_n(list_fv) / len(list_fv)
-              else:
-                fv = netfv_cls.forward(model_inputs[0])
-              fv = make_fc(fv, 'fv', fc_fisher_circulant, True)
+          with tf.variable_scope("Fisher_vector_{}".format(name), reuse=tf.AUTO_REUSE):
+            netfv_cls = NetFV(size, max_frames, fv_cluster_size, 
+              embedding_add_batch_norm, fv_couple_weights, fv_coupling_factor, 
+              is_training)
+            list_fv = []
+            if len(model_inputs) > 1:
+              for model_input in model_inputs:
+                fv = netfv_cls.forward(model_input)
+                list_fv.append(fv)
+              fv = tf.add_n(list_fv) / len(list_fv)
+            else:
+              fv = netfv_cls.forward(model_inputs[0])
+            fv = make_fc(fv, 'fv', fc_fisher_circulant, True)
           embeddings.append(fv)
 
         if FLAGS.add_moments:
-          last = embeddings[-1] if embeddings else None
-          with tf.control_dependencies([None]):
-            with tf.variable_scope("Moment_Stats_{}".format(name), reuse=tf.AUTO_REUSE):
-              list_stat = []
-              if len(model_inputs) > 1:
-                for model_input in model_inputs:
-                  model_input = tf.reshape(model_input, [-1, max_frames, size])
-                  moment1, moment2 = tf.nn.moments(model_input, axes=1)
-                  moments = tf.concat([moment1, moment2], 1)
-                  list_stat.append(moments)
-                moments = tf.add_n(list_stat) / len(list_stat)
-              else:
+          with tf.variable_scope("Moment_Stats_{}".format(name), reuse=tf.AUTO_REUSE):
+            list_stat = []
+            if len(model_inputs) > 1:
+              for model_input in model_inputs:
                 model_input = tf.reshape(model_input, [-1, max_frames, size])
                 moment1, moment2 = tf.nn.moments(model_input, axes=1)
                 moments = tf.concat([moment1, moment2], 1)
-              moments = make_fc(moments, "moments", fc_moment_circulant, True)
+                list_stat.append(moments)
+              moments = tf.add_n(list_stat) / len(list_stat)
+            else:
+              model_input = tf.reshape(model_input, [-1, max_frames, size])
+              moment1, moment2 = tf.nn.moments(model_input, axes=1)
+              moments = tf.concat([moment1, moment2], 1)
+            moments = make_fc(moments, "moments", fc_moment_circulant, True)
           embeddings.append(moments)
 
       return embeddings
