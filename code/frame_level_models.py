@@ -137,6 +137,8 @@ flags.DEFINE_bool('fc_moment_circulant', False, "Circulant FC after Moment")
 
 flags.DEFINE_bool('dbof_circulant', False, "Make DBoF Circulant")
 
+flags.DEFINE_bool('no_audio', False, "remove audio for embeding")
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
