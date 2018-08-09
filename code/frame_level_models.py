@@ -140,6 +140,8 @@ flags.DEFINE_bool('dbof_circulant', False, "Make DBoF Circulant")
 
 flags.DEFINE_bool('no_audio', False, "remove audio for embeding")
 
+flags.DEFINE_bool('use_d_matrix', False, "use D matrice {-1, +1} as diag")
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
