@@ -1,5 +1,6 @@
 
 import math
+import numpy as np
 
 import model_utils as utils
 
@@ -152,6 +153,54 @@ class CirculantLayerWithFactor:
         ret = tf.manip.roll(ret, 1, axis=1)
       mat.append(ret)
     return tf.concat(mat, axis=1)[..., :self.out_dim]
+
+
+class CirculantLayerWithDiag:
+    
+  def __init__(self, input_shape, out_dim, k_factor=1, initializer=None):
+    self.input_shape = input_shape
+    self.out_dim = out_dim
+    self.k_factor = k_factor
+    self.initializer = initializer
+    self.max_dim = input_shape[-1]
+            
+    dim = 0
+    self.parameters = []
+    count = 0
+    while dim < self.out_dim:
+      factor = []
+      for k in range(self.k_factor):
+        w = self._get_weights('weights_circ{}_f{}'.format(count, k))
+        d = tf.convert_to_tensor(np.random.choice([-1, 1], size=(1, self.max_dim)), dtype=tf.float32)
+        factor.append((w, d))
+      count += 1
+      self.parameters.append(factor)
+      dim += self.max_dim
+
+  def _get_weights(self, name=None):
+    return tf.get_variable(
+                name=name,
+                shape=(1, self.max_dim),
+                dtype=tf.float32,
+                initializer=self.initializer,
+                trainable=True)
+
+  def matmul(self, X):
+    mat = []
+    batch_size = X.get_shape()[0]
+    for params in self.parameters:
+      ret = X
+      for weights, diag in params:
+        fft1 = tf.spectral.rfft(ret)
+        fft2 = tf.spectral.rfft(weights[..., ::-1])
+        fft_mul = tf.multiply(fft1, fft2)
+        ifft_val = tf.spectral.irfft(fft_mul)
+        ret = tf.cast(tf.real(ifft_val), tf.float32)
+        ret = tf.multiply(ret, diag)
+        ret = tf.manip.roll(ret, 1, axis=1)
+      mat.append(ret)
+    return tf.concat(mat, axis=1)[..., :self.out_dim]
+
 
 class NetVLAD():
   """

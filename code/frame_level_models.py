@@ -20,7 +20,8 @@ import models
 import video_level_models
 import tensorflow as tf
 import model_utils as utils
-from utils_layer import CirculantLayer, CirculantLayerWithFactor, DBofCirculant
+from utils_layer import (CirculantLayer, CirculantLayerWithFactor, 
+  CirculantLayerWithDiag, DBofCirculant)
 from utils_layer import NetVLAD, DBof, NetFV, SoftDBoF, LightVLAD
 from utils_layer import context_gating
 
@@ -4012,6 +4013,11 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
       sample_model_inputs_video.append(sample_model_input[:, 0:1024])
       sample_model_inputs_audio.append(sample_model_input[:, 1024:])
 
+    if FLAGS.use_d_matrix:
+      CirculantLayer = CirculantLayerWithDiag
+    else:
+      CirculantLayer = CirculantLayerWithFactor
+
 
     def make_fc(input_, name, circulant, batch_norm):
       with tf.variable_scope(name):
@@ -4022,7 +4028,7 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
           activation = tf.matmul(input_, fc_hidden_weights)
         else:
           input_dim = input_.get_shape().as_list()
-          circ_layer_hidden = CirculantLayerWithFactor(input_dim, fc_hidden_size, 
+          circ_layer_hidden = CirculantLayer(input_dim, fc_hidden_size, 
                       k_factor=k_factor, initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(fc_hidden_size)))
           activation = circ_layer_hidden.matmul(input_)
 
