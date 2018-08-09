@@ -135,6 +135,8 @@ flags.DEFINE_bool('fc_netvlad_circulant', False, "Circulant FC after NetVald")
 flags.DEFINE_bool('fc_fisher_circulant', False, "Circulant FC after fisher")
 flags.DEFINE_bool('fc_moment_circulant', False, "Circulant FC after Moment")
 
+flags.DEFINE_bool('dbof_circulant', False, "Make DBoF Circulant")
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -4038,6 +4040,8 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
       activation = tf.nn.relu6(activation)
       return activation
 
+    if FLAGS.dbof_circulant:
+      DBof = DBofCirculant
 
     def make_embedding(model_inputs, size, 
       dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, name):
