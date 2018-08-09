@@ -4052,7 +4052,8 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
         if FLAGS.add_dbof:
           with tf.variable_scope("DBoF_{}".format(name), reuse=tf.AUTO_REUSE):
             dbof_cls = DBof(size, max_frames, dbof_cluster_size, 
-              FLAGS.dbof_pooling_method, embedding_add_batch_norm, is_training)
+              FLAGS.dbof_pooling_method, embedding_add_batch_norm, is_training, 
+              k_factor=k_factor)
             list_dbof = []
             if len(model_inputs) > 1:
               for model_input in model_inputs:
