@@ -4043,7 +4043,9 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
       return activation
 
     if FLAGS.dbof_circulant:
-      DBof = DBofCirculant
+      DBof_ = DBofCirculant
+    else:
+      DBof_ = DBof
 
     def make_embedding(model_inputs, size, 
       dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, name):
@@ -4053,7 +4055,7 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
 
         if FLAGS.add_dbof:
           with tf.variable_scope("DBoF_{}".format(name), reuse=tf.AUTO_REUSE):
-            dbof_cls = DBof(size, max_frames, dbof_cluster_size, 
+            dbof_cls = DBof_(size, max_frames, dbof_cluster_size, 
               FLAGS.dbof_pooling_method, embedding_add_batch_norm, is_training, 
               k_factor=k_factor)
             list_dbof = []
