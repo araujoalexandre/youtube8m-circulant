@@ -318,8 +318,8 @@ class NetFV():
 
 class DBof():
 
-  def __init__(self, feature_size, max_frames, cluster_size, dbof_pooling_method,
-              add_batch_norm, is_training):
+  def __init__(self, feature_size, max_frames, cluster_size, 
+    dbof_pooling_method, add_batch_norm, is_training, **kargs):
     self.feature_size = feature_size
     self.max_frames = max_frames
     self.cluster_size = cluster_size
@@ -466,14 +466,8 @@ class LightVLAD():
 
 class DBofCirculant():
 
-  def __init__(self, 
-               feature_size, 
-               max_frames, 
-               cluster_size, 
-               dbof_pooling_method,
-               add_batch_norm, 
-               k_factor,
-               is_training):
+  def __init__(self, feature_size, max_frames, cluster_size, 
+    dbof_pooling_method, add_batch_norm, is_training, k_factor=1):
     self.feature_size = feature_size
     self.max_frames = max_frames
     self.cluster_size = cluster_size
