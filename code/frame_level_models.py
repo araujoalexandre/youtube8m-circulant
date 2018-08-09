@@ -4115,12 +4115,17 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
 
       return embeddings
 
-    embedding_video = make_embedding(sample_model_inputs_video, 1024, 
-      dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, 'video')
-    embedding_audio = make_embedding(sample_model_inputs_audio, 128, 
-      dbof_cluster_size // 2, netvlad_cluster_size // 2, fv_cluster_size // 2, 'audio')
+    if FLAGS.no_audio:
+      embedding_video = make_embedding(sample_model_inputs_video, 1024, 
+        dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, 'video')
+      activation = tf.concat([*embedding_video], 1)
+    else:
+      embedding_video = make_embedding(sample_model_inputs_video, 1024, 
+        dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, 'video')
+      embedding_audio = make_embedding(sample_model_inputs_audio, 128, 
+        dbof_cluster_size // 2, netvlad_cluster_size // 2, fv_cluster_size // 2, 'audio')
+      activation = tf.concat([*embedding_video, *embedding_audio], 1)
 
-    activation = tf.concat([*embedding_video, *embedding_audio], 1)
 
     aggregated_model = getattr(video_level_models,
                                FLAGS.video_level_classifier_model)
