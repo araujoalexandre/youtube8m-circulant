@@ -142,6 +142,8 @@ flags.DEFINE_bool('no_audio', False, "remove audio for embeding")
 
 flags.DEFINE_bool('use_d_matrix', False, "use D matrice {-1, +1} as diag")
 
+flags.DEFINE_bool('average_FC', False, "average Fully Connected output of embedding")
+
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -4126,6 +4128,17 @@ class EnsembleEarlyConcatAverageWithFCvF(models.BaseModel):
           embeddings.append(moments)
 
       return embeddings
+
+    if FLAGS.average_FC:
+      embedding_video = make_embedding(sample_model_inputs_video, 1024, 
+        dbof_cluster_size, netvlad_cluster_size, fv_cluster_size, 'video')
+      embedding_audio = make_embedding(sample_model_inputs_audio, 128, 
+        dbof_cluster_size // 2, netvlad_cluster_size // 2, fv_cluster_size // 2, 'audio')
+      
+      embedding_video = tf.add_n(embedding_video) / len(embedding_video)
+      embedding_audio = tf.add_n(embedding_audio) / len(embedding_audio)
+      activation = tf.concat([embedding_video, embedding_audio], 1)
+
 
     if FLAGS.no_audio:
       embedding_video = make_embedding(sample_model_inputs_video, 1024, 
