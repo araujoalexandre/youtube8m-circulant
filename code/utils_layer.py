@@ -171,7 +171,8 @@ class CirculantLayerWithDiag:
       factor = []
       for k in range(self.k_factor):
         w = self._get_weights('weights_circ{}_f{}'.format(count, k))
-        d = tf.Variable(np.random.choice([-1, 1], size=(1, self.max_dim)), dtype=tf.float32, trainable=False)
+        d = tf.Variable(np.random.choice([-1, 1], size=(1, self.max_dim)), 
+          dtype=tf.float32, trainable=False, name='weights_diag{}_f{}'.format(count, k))
         factor.append((w, d))
       count += 1
       self.parameters.append(factor)
